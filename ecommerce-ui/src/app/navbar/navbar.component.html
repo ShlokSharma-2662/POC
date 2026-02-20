@@ -1,0 +1,113 @@
+<nav class="navbar navbar-expand-lg navbar-light bg-white">
+  <div class="container">
+    <a class="navbar-brand" routerLink="/home">E-Commerce App</a>
+
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
+            aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <div class="collapse navbar-collapse" id="navbarNav">
+      <ul class="navbar-nav ms-auto align-items-center">
+        <!-- Visible links: Home, Products -->
+        <li class="nav-item">
+          <a class="nav-link" routerLink="/home">Home</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" routerLink="/products">Products</a>
+        </li>
+
+        <!-- Cart: icon-only with small badge -->
+        <li class="nav-item ms-2 me-3">
+          <a class="nav-link position-relative" 
+             routerLink="/cart" 
+             aria-label="Cart">
+            <i class="fas fa-shopping-cart"></i>
+            <span *ngIf="cartItemCount > 0" class="count-badge">{{ cartItemCount }}</span>
+          </a>
+        </li>
+
+        <!-- Wishlist: icon-only with small badge (for guest users) -->
+        <li class="nav-item me-3" *ngIf="!isLoggedIn">
+          <a class="nav-link position-relative" 
+             routerLink="/wishlist" 
+             aria-label="Wishlist">
+            <i class="fas fa-heart"></i>
+            <span *ngIf="wishlistCount > 0" class="count-badge">{{ wishlistCount }}</span>
+          </a>
+        </li>
+
+        <!-- Guest User: Sign In / Sign Up -->
+        <li class="nav-item" *ngIf="!isLoggedIn">
+          <div class="auth-buttons">
+            <a class="btn btn-outline-primary" routerLink="/login">
+              <i class="fas fa-sign-in-alt"></i>
+              <span>Sign In</span>
+            </a>
+            <a class="btn btn-primary" routerLink="/register">
+              <i class="fas fa-user-plus"></i>
+              <span>Sign Up</span>
+            </a>
+          </div>
+        </li>
+
+        <!-- Logged In User: Profile dropdown -->
+        <li class="nav-item dropdown" *ngIf="isLoggedIn">
+          <a class="nav-link dropdown-toggle d-flex align-items-center" 
+             href="javascript:void(0)" 
+             role="button" 
+             (click)="toggleProfileDropdown($event)"
+             [class.show]="isProfileDropdownOpen">
+            <i class="fas fa-user-circle me-2"></i>
+            Profile
+            <span *ngIf="wishlistCount > 0" class="wishlist-dot" title="Wishlist items">{{ wishlistCount }}</span>
+          </a>
+          <ul class="dropdown-menu dropdown-menu-end" 
+              [class.show]="isProfileDropdownOpen">
+            <li>
+              <a class="dropdown-item d-flex align-items-center" 
+                 routerLink="/profile"
+                 (click)="onProfileItemClick($event)">
+                <i class="fas fa-user me-2"></i>
+                View Profile
+              </a>
+            </li>
+            <li>
+              <a class="dropdown-item d-flex align-items-center" 
+                 routerLink="/wishlist"
+                 (click)="onProfileItemClick($event)">
+                <i class="fas fa-heart me-2 text-danger"></i>
+                Wishlist
+                <span *ngIf="wishlistCount > 0" class="badge bg-danger ms-auto">{{ wishlistCount }}</span>
+              </a>
+            </li>
+            <li>
+              <a class="dropdown-item d-flex align-items-center" 
+                 routerLink="/my-orders"
+                 (click)="onProfileItemClick($event)">
+                <i class="fas fa-box me-2"></i>
+                My Orders
+              </a>
+            </li>
+            <li><hr class="dropdown-divider"></li>
+            <li>
+              <button class="dropdown-item d-flex align-items-center" 
+                      (click)="logout()">
+                <i class="fas fa-sign-out-alt me-2"></i>
+                Logout
+              </button>
+            </li>
+          </ul>
+        </li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<!-- Logout Confirmation Popup -->
+<app-logout-confirmation 
+  *ngIf="showLogoutConfirmation"
+  (confirm)="onLogoutConfirm()"
+  (cancel)="onLogoutCancel()">
+</app-logout-confirmation>
+

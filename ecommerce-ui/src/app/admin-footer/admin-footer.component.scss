@@ -1,0 +1,47 @@
+.admin-footer {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white;
+  margin-top: auto; // Push footer to bottom
+  padding: 1rem 0; // Reduced padding
+  border-top-left-radius: 16px;
+  border-top-right-radius: 16px;
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.1);
+  position: relative;
+  z-index: var(--z-sticky);
+  flex-shrink: 0; // Prevent footer from shrinking
+}
+
+.footer-content {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.footer-copyright {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.9rem;
+  font-weight: 500;
+  text-align: center;
+  margin: 0; // Remove default margins
+}
+
+// Mobile Responsive Adjustments
+@media (max-width: 576px) {
+  .admin-footer {
+    margin-top: auto;
+    padding: 0.75rem 0; // Further reduced padding on mobile
+    border-radius: 0;
+  }
+  
+  .footer-copyright {
+    font-size: 0.85rem;
+  }
+}
+
+// Ensure footer is always at bottom
+@media (min-width: 577px) {
+  .admin-footer {
+    border-top-left-radius: 16px;
+    border-top-right-radius: 16px;
+  }
+}

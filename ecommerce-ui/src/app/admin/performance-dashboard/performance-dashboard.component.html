@@ -1,0 +1,457 @@
+<!-- Header Section -->
+<div class="admin-performance-header">
+  <div class="container">
+    <div class="header-content">
+      <h1 class="page-title">
+        <i class="fas fa-chart-line"></i>
+        Performance Dashboard
+      </h1>
+      <p class="page-subtitle">Monitor system performance, API response times, and analytics</p>
+    </div>
+  </div>
+</div>
+
+<div class="container my-4 min-vh-100">
+  <!-- Controls Section -->
+  <div class="controls-section card shadow-sm mb-4">
+    <div class="card-body">
+      <div class="controls-grid">
+        <div class="time-range-box">
+          <label class="form-label">Time Range</label>
+          <select class="form-select" [(ngModel)]="selectedTimeRange" (change)="onTimeRangeChange()">
+            <option value="1h">Last Hour</option>
+            <option value="24h">Last 24 Hours</option>
+            <option value="7d">Last 7 Days</option>
+            <option value="30d">Last 30 Days</option>
+          </select>
+        </div>
+        <div class="refresh-box">
+          <label class="form-label">Auto Refresh</label>
+          <select class="form-select" [(ngModel)]="refreshInterval" (change)="onRefreshIntervalChange()">
+            <option value="0">Off</option>
+            <option value="30">30 seconds</option>
+            <option value="60">1 minute</option>
+            <option value="300">5 minutes</option>
+          </select>
+        </div>
+        <div class="actions-box">
+          <button class="btn btn-outline-primary" (click)="refreshData()" [disabled]="loading">
+            <i class="fas fa-rotate" [class.fa-spin]="loading"></i>
+            Refresh Now
+          </button>
+          <button class="btn btn-outline-success" (click)="seedMetrics()" [disabled]="loading">
+            <i class="fas fa-seedling"></i>
+            Seed Data
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading State -->
+  <app-loader 
+    *ngIf="loading" 
+    message="Loading performance data..." 
+    subMessage="Please wait while we fetch the latest metrics">
+  </app-loader>
+
+  <!-- Error State -->
+  <div *ngIf="!loading && errorMessage" class="error-section">
+    <div class="error-content">
+      <div class="error-icon"><i class="fas fa-exclamation-triangle"></i></div>
+      <h3>Unable to load performance data</h3>
+      <p>{{ errorMessage }}</p>
+      <button class="btn btn-primary" (click)="loadMetrics()"><i class="fas fa-rotate"></i> Retry</button>
+    </div>
+  </div>
+
+  <!-- Dashboard Content -->
+  <div *ngIf="!loading && !errorMessage">
+    <!-- Key Metrics Cards -->
+    <div class="metrics-grid mb-4">
+      <div class="metric-card">
+        <div class="metric-icon avg-response">
+          <i class="fas fa-clock"></i>
+        </div>
+        <div class="metric-content">
+          <div class="metric-value">{{ avgResponseTime | number:'1.0-0' }}ms</div>
+          <div class="metric-label">Avg Response Time</div>
+          <div class="metric-trend" [ngClass]="{'trend-up': responseTrend > 0, 'trend-down': responseTrend < 0}">
+            <i class="fas" [ngClass]="responseTrend > 0 ? 'fa-arrow-up' : 'fa-arrow-down'"></i>
+            {{ Math.abs(responseTrend) | number:'1.0-1' }}%
+          </div>
+        </div>
+      </div>
+
+      <div class="metric-card">
+        <div class="metric-icon error-rate">
+          <i class="fas fa-exclamation-circle"></i>
+        </div>
+        <div class="metric-content">
+          <div class="metric-value">{{ errorRate | number:'1.0-1' }}%</div>
+          <div class="metric-label">Error Rate</div>
+          <div class="metric-trend" [ngClass]="{'trend-up': errorTrend > 0, 'trend-down': errorTrend < 0}">
+            <i class="fas" [ngClass]="errorTrend > 0 ? 'fa-arrow-up' : 'fa-arrow-down'"></i>
+            {{ Math.abs(errorTrend) | number:'1.0-1' }}%
+          </div>
+        </div>
+      </div>
+
+      <div class="metric-card">
+        <div class="metric-icon throughput">
+          <i class="fas fa-tachometer-alt"></i>
+        </div>
+        <div class="metric-content">
+          <div class="metric-value">{{ throughput | number:'1.0-0' }}</div>
+          <div class="metric-label">Requests/min</div>
+          <div class="metric-trend" [ngClass]="{'trend-up': throughputTrend > 0, 'trend-down': throughputTrend < 0}">
+            <i class="fas" [ngClass]="throughputTrend > 0 ? 'fa-arrow-up' : 'fa-arrow-down'"></i>
+            {{ Math.abs(throughputTrend) | number:'1.0-1' }}%
+          </div>
+        </div>
+      </div>
+
+      <div class="metric-card">
+        <div class="metric-icon uptime">
+          <i class="fas fa-server"></i>
+        </div>
+        <div class="metric-content">
+          <div class="metric-value">{{ uptime | number:'1.0-2' }}%</div>
+          <div class="metric-label">System Uptime</div>
+          <div class="metric-trend trend-stable">
+            <i class="fas fa-check-circle"></i>
+            Stable
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Charts Section -->
+    <div class="charts-grid">
+      <!-- Response Time Chart -->
+      <div class="chart-card">
+        <div class="card shadow-sm">
+          <div class="card-header">
+            <h5 class="card-title">
+              <i class="fas fa-chart-line me-2"></i>
+              API Response Times
+            </h5>
+            <div class="chart-controls">
+              <button class="btn btn-sm btn-outline-secondary" [class.active]="chartType === 'line'" (click)="setChartType('line')">
+                <i class="fas fa-chart-line"></i>
+              </button>
+              <button class="btn btn-sm btn-outline-secondary" [class.active]="chartType === 'bar'" (click)="setChartType('bar')">
+                <i class="fas fa-chart-bar"></i>
+              </button>
+            </div>
+          </div>
+          <div class="card-body">
+            <canvas baseChart 
+                    [datasets]="chartData" 
+                    [labels]="chartLabels"
+                    [options]="chartOptions" 
+                    [type]="chartType">
+            </canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Error Rate Chart -->
+      <div class="chart-card">
+        <div class="card shadow-sm">
+          <div class="card-header">
+            <h5 class="card-title">
+              <i class="fas fa-exclamation-triangle me-2"></i>
+              Error Rate Trends
+            </h5>
+          </div>
+          <div class="card-body">
+            <canvas baseChart 
+                    [datasets]="errorChartData" 
+                    [labels]="errorChartLabels"
+                    [options]="errorChartOptions" 
+                    type="line">
+            </canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Endpoint Performance Table -->
+      <div class="chart-card full-width">
+        <div class="card shadow-sm">
+          <div class="card-header">
+            <h5 class="card-title">
+              <i class="fas fa-list me-2"></i>
+              Endpoint Performance Details
+            </h5>
+            <div class="table-controls">
+              <input class="form-control form-control-sm" placeholder="Filter endpoints..." [(ngModel)]="endpointFilter" (input)="onEndpointFilterChange()">
+              <button class="btn btn-sm btn-outline-primary" (click)="toggleDetailedView()">
+                <i class="fas" [ngClass]="showDetailedView ? 'fa-list' : 'fa-table'"></i>
+                {{ showDetailedView ? 'Summary View' : 'Detailed View' }}
+              </button>
+              <button *ngIf="showDetailedView && endpointFilter" class="btn btn-sm btn-outline-secondary" (click)="clearEndpointFilter()">
+                <i class="fas fa-times"></i>
+                Clear Filter
+              </button>
+            </div>
+          </div>
+          <div class="card-body p-0">
+            <!-- Summary View -->
+            <div *ngIf="!showDetailedView" class="table-responsive">
+              <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                  <tr>
+                    <th>Endpoint</th>
+                    <th>Avg Response Time</th>
+                    <th>Min/Max</th>
+                    <th>Status</th>
+                    <th>Last Called</th>
+                    <th>Requests</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let endpoint of filteredEndpoints">
+                    <td class="fw-semibold">{{ endpoint.name }}</td>
+                    <td>
+                      <span class="response-time" [ngClass]="getResponseTimeClass(endpoint.avgResponseTime)">
+                        {{ endpoint.avgResponseTime | number:'1.0-0' }}ms
+                      </span>
+                    </td>
+                    <td class="text-muted">{{ endpoint.minTime }}ms / {{ endpoint.maxTime }}ms</td>
+                    <td>
+                      <span class="status-badge" [ngClass]="getStatusClass(endpoint.healthStatus)">
+                        {{ endpoint.healthStatus }}
+                      </span>
+                    </td>
+                    <td>{{ endpoint.lastCalled | date:'medium' }}</td>
+                    <td>{{ endpoint.requestCount | number }}</td>
+                    <td>
+                      <button class="btn btn-sm btn-outline-secondary" (click)="viewEndpointDetails(endpoint)">
+                        <i class="fas fa-eye"></i>
+                        Details
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Detailed View -->
+            <div *ngIf="showDetailedView" class="detailed-view">
+              <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                  <thead class="table-light">
+                    <tr>
+                      <th>Timestamp</th>
+                      <th>Endpoint</th>
+                      <th>Response Time</th>
+                      <th>Status Code</th>
+                      <th>Status</th>
+                      <th>Duration</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr *ngFor="let request of paginatedRequests" [ngClass]="getRequestRowClass(request)">
+                      <td>{{ request.timestamp | date:'medium' }}</td>
+                      <td class="fw-semibold">{{ request.endpoint }}</td>
+                      <td>
+                        <span class="response-time" [ngClass]="getResponseTimeClass(request.responseTimeMs)">
+                          {{ request.responseTimeMs | number:'1.0-0' }}ms
+                        </span>
+                      </td>
+                      <td>
+                        <span class="status-code" [ngClass]="getStatusCodeClass(request.statusCode)">
+                          {{ request.statusCode }}
+                        </span>
+                      </td>
+                      <td>
+                        <span class="status-badge" [ngClass]="getRequestStatusClass(request.statusCode)">
+                          {{ getRequestStatus(request.statusCode) }}
+                        </span>
+                      </td>
+                      <td class="text-muted">{{ request.responseTimeMs | number:'1.0-0' }}ms</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <!-- Pagination for Detailed View -->
+              <div class="pagination-section">
+                <div class="d-flex justify-content-between align-items-center p-3">
+                  <div class="pagination-info">
+                    Showing {{ (currentPage - 1) * pageSize + 1 }} to 
+                    {{ Math.min(currentPage * pageSize, totalCount) }} of {{ totalCount }} requests
+                  </div>
+                  <div class="pagination-controls">
+                    <div class="btn-group">
+                      <button class="btn btn-outline-secondary btn-sm" 
+                              (click)="previousPage()" 
+                              [disabled]="currentPage === 1">
+                        <i class="fas fa-chevron-left"></i>
+                        Previous
+                      </button>
+                      <div class="page-numbers ms-2">
+                        <button 
+                          *ngFor="let page of getPageNumbers()" 
+                          class="btn btn-outline-secondary btn-sm"
+                          [class.active]="page === currentPage"
+                          (click)="goToPage(page)">
+                          {{ page }}
+                        </button>
+                      </div>
+                      <button class="btn btn-outline-secondary btn-sm" 
+                              (click)="nextPage()" 
+                              [disabled]="currentPage === totalPages">
+                        Next
+                        <i class="fas fa-chevron-right"></i>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Last Updated Info -->
+    <div class="text-muted text-center mt-4">
+      <i class="fas fa-clock me-1"></i>
+      Last updated: {{ lastUpdated | date:'medium' }}
+    </div>
+  </div>
+</div>
+
+<!-- Endpoint Details Modal -->
+<div class="modal fade" id="endpointDetailsModal" tabindex="-1" aria-labelledby="endpointDetailsModalLabel" aria-hidden="true" (click)="onModalBackdropClick($event)">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="endpointDetailsModalLabel">
+          <i class="fas fa-info-circle me-2"></i>
+          Endpoint Details: {{ selectedEndpoint?.name }}
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" *ngIf="selectedEndpoint">
+        <!-- Endpoint Overview -->
+        <div class="row mb-4">
+          <div class="col-md-6">
+            <div class="card">
+              <div class="card-body">
+                <h6 class="card-title">Performance Overview</h6>
+                <div class="row">
+                  <div class="col-6">
+                    <div class="metric-item">
+                      <div class="metric-label">Avg Response Time</div>
+                      <div class="metric-value">{{ selectedEndpoint.avgResponseTime | number:'1.0-0' }}ms</div>
+                    </div>
+                  </div>
+                  <div class="col-6">
+                    <div class="metric-item">
+                      <div class="metric-label">Total Requests</div>
+                      <div class="metric-value">{{ selectedEndpoint.requestCount }}</div>
+                    </div>
+                  </div>
+                  <div class="col-6">
+                    <div class="metric-item">
+                      <div class="metric-label">Error Rate</div>
+                      <div class="metric-value">{{ selectedEndpoint.errorRate | number:'1.0-1' }}%</div>
+                    </div>
+                  </div>
+                  <div class="col-6">
+                    <div class="metric-item">
+                      <div class="metric-label">Success Rate</div>
+                      <div class="metric-value">{{ selectedEndpoint.successRate | number:'1.0-1' }}%</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="card">
+              <div class="card-body">
+                <h6 class="card-title">Response Time Range</h6>
+                <div class="row">
+                  <div class="col-6">
+                    <div class="metric-item">
+                      <div class="metric-label">Min Response Time</div>
+                      <div class="metric-value">{{ selectedEndpoint.minTime }}ms</div>
+                    </div>
+                  </div>
+                  <div class="col-6">
+                    <div class="metric-item">
+                      <div class="metric-label">Max Response Time</div>
+                      <div class="metric-value">{{ selectedEndpoint.maxTime }}ms</div>
+                    </div>
+                  </div>
+                  <div class="col-12">
+                    <div class="metric-item">
+                      <div class="metric-label">Health Status</div>
+                      <div class="metric-value">
+                        <span class="status-badge" [ngClass]="getStatusClass(selectedEndpoint.healthStatus)">
+                          {{ selectedEndpoint.healthStatus }}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Recent Requests Table -->
+        <div class="card">
+          <div class="card-header">
+            <h6 class="card-title mb-0">Recent Requests</h6>
+          </div>
+          <div class="card-body p-0">
+            <div class="table-responsive">
+              <table class="table table-sm mb-0">
+                <thead class="table-light">
+                  <tr>
+                    <th>Timestamp</th>
+                    <th>Response Time</th>
+                    <th>Status Code</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let request of endpointRequests" [ngClass]="getRequestRowClass(request)">
+                    <td>{{ request.timestamp | date:'short' }}</td>
+                    <td>
+                      <span class="response-time" [ngClass]="getResponseTimeClass(request.responseTimeMs)">
+                        {{ request.responseTimeMs }}ms
+                      </span>
+                    </td>
+                    <td>
+                      <span class="status-code" [ngClass]="getStatusCodeClass(request.statusCode)">
+                        {{ request.statusCode }}
+                      </span>
+                    </td>
+                    <td>
+                      <span class="status-badge" [ngClass]="getRequestStatusClass(request.statusCode)">
+                        {{ getRequestStatus(request.statusCode) }}
+                      </span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-primary" (click)="viewDetailedData()">View Full Data</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<app-admin-footer></app-admin-footer>

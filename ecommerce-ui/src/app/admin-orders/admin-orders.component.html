@@ -1,0 +1,228 @@
+<!-- Header Section -->
+<div class="admin-orders-header">
+  <div class="container">
+    <div class="header-content">
+      <h1 class="page-title">
+        <i class="fas fa-shopping-cart"></i>
+        Manage Orders
+      </h1>
+      <p class="page-subtitle">Track, update, and manage customer orders</p>
+    </div>
+  </div>
+</div>
+
+<div class="container my-4 min-vh-100">
+  <!-- Filters / Actions -->
+  <div class="filters card shadow-sm mb-3">
+    <div class="card-body">
+      <div class="filters-grid">
+        <div class="search-box">
+          <div class="input-group">
+            <span class="input-group-text"><i class="fas fa-search"></i></span>
+            <input class="form-control" placeholder="Search by customer, phone or order ID" [(ngModel)]="searchTerm" (input)="loadOrders()">
+          </div>
+        </div>
+        <div class="status-box">
+          <select class="form-select" [(ngModel)]="statusFilter" (change)="loadOrders()">
+            <option value="">All Status</option>
+            <option value="Pending">Pending</option>
+            <option value="Shipped">Shipped</option>
+            <option value="Delivered">Delivered</option>
+          </select>
+        </div>
+        <div class="actions-box">
+          <button class="btn btn-outline-secondary" (click)="searchTerm=''; statusFilter=''; pageNumber=1; loadOrders()" title="Clear filters">
+            <i class="fas fa-rotate"></i>
+            Clear
+          </button>
+          <button class="btn btn-outline-success" (click)="exportToCsv()" title="Export to CSV" [disabled]="!orders || orders.length === 0">
+            <i class="fas fa-download"></i>
+            Export CSV
+          </button>
+          <label class="form-label mb-0">Rows per page:</label>
+          <select class="form-select form-select-sm w-auto" [(ngModel)]="pageSize" (change)="onPageSizeChange()">
+            <option *ngFor="let size of [5, 10, 25, 50]" [value]="size">{{ size }}</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading State -->
+  <app-loader 
+    *ngIf="loading" 
+    message="Loading orders..." 
+    subMessage="Please wait while we fetch the latest orders">
+  </app-loader>
+
+  <!-- Error State -->
+  <div *ngIf="!loading && error" class="error-section">
+    <div class="error-content">
+      <div class="error-icon"><i class="fas fa-exclamation-triangle"></i></div>
+      <h3>Unable to load orders</h3>
+      <p>{{ error }}</p>
+      <button class="btn btn-primary" (click)="loadOrders()"><i class="fas fa-rotate"></i> Retry</button>
+    </div>
+  </div>
+
+  <!-- Empty State -->
+  <div *ngIf="!loading && !error && orders.length === 0" class="empty-section">
+    <div class="empty-content">
+      <div class="empty-icon"><i class="fas fa-shopping-bag"></i></div>
+      <h3>No orders found</h3>
+      <p>Try adjusting your filters or check back later for new orders</p>
+    </div>
+  </div>
+
+  <!-- Orders Table -->
+  <div class="table-responsive" *ngIf="!loading && !error && orders.length > 0">
+    <table class="table table-hover align-middle orders-table">
+      <thead class="table-light text-center">
+        <tr>
+          <th>Order ID</th>
+          <th>Customer</th>
+          <th>Phone</th>
+          <th>Date</th>
+          <th>Status</th>
+          <th>Items</th>
+          <th class="text-end">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let order of orders" class="text-center">
+          <td>
+            <div class="order-id-cell" [title]="order.id">
+              <span class="order-id-truncate">{{ order.id }}</span>
+              <button class="copy-btn" (click)="copyOrderId(order.id)" title="Copy Order ID" type="button">
+                {{ copiedId === order.id ? 'Copied' : 'Copy' }}
+              </button>
+            </div>
+          </td>
+          <td class="text-start fw-semibold">{{ order.customerName }}</td>
+          <td>{{ order.phone }}</td>
+          <td>{{ getFormattedDate(order.createdAt) }}</td>
+          <td>
+            <div class="status-toggle" role="group" aria-label="Change status">
+              <button type="button" class="status-option"
+                      [ngClass]="{'is-active': order.status==='Pending', 'pending': true}"
+                      (click)="quickChangeStatus(order, 'Pending')">
+                Pending
+              </button>
+              <button type="button" class="status-option"
+                      [ngClass]="{'is-active': order.status==='Shipped', 'shipped': true}"
+                      (click)="quickChangeStatus(order, 'Shipped')">
+                Shipped
+              </button>
+              <button type="button" class="status-option"
+                      [ngClass]="{'is-active': order.status==='Delivered', 'delivered': true}"
+                      (click)="quickChangeStatus(order, 'Delivered')">
+                Delivered
+              </button>
+            </div>
+          </td>
+          <td>{{ order.items.length }}</td>
+          <td>
+            <div class="d-flex gap-2 justify-content-end flex-wrap">
+              <button class="btn btn-outline-secondary btn-sm" (click)="viewDetails(order)">
+                <i class="fas fa-eye"></i>
+                View
+              </button>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Pagination -->
+  <div class="d-flex justify-content-between align-items-center" *ngIf="!loading && !error && orders.length > 0">
+    <div>Page {{ pageNumber }} of {{ getTotalPages() }}</div>
+    <div class="btn-group">
+      <button class="btn btn-outline-secondary" (click)="decrementPage()" [disabled]="pageNumber === 1">Prev</button>
+      <button class="btn btn-outline-secondary" (click)="nextPage()" [disabled]="pageNumber * pageSize >= totalCount">Next</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast container (fixed) -->
+<div class="toast-container-fixed" *ngIf="statusSuccessMessage" aria-live="polite" aria-atomic="true">
+  <div class="toast-item success" role="alert">
+    <div class="toast-icon">✅</div>
+    <div class="toast-content">
+      <div class="toast-title">Success</div>
+      <div class="toast-message">{{ statusSuccessMessage }}</div>
+    </div>
+    <button type="button" class="btn-close" aria-label="Close" (click)="statusSuccessMessage = ''"></button>
+  </div>
+</div>
+
+<!-- Modal for Viewing Order Details -->
+<div class="modal fade show d-block" *ngIf="selectedOrder" style="background: rgba(0,0,0,0.4)">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content shadow order-modal">
+      <div class="modal-header">
+        <div class="d-flex align-items-center gap-2">
+          <span class="modal-icon">📦</span>
+          <h5 class="modal-title mb-0">Order <span class="text-muted">#{{ selectedOrder.id }}</span></h5>
+        </div>
+        <div>
+          <span class="chip-badge status-chip"
+            [ngClass]="{
+              'is-pending': selectedOrder.status==='Pending',
+              'is-shipped': selectedOrder.status==='Shipped',
+              'is-delivered': selectedOrder.status==='Delivered'
+            }">{{ selectedOrder.status }}</span>
+        </div>
+      </div>
+      <div class="modal-body">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <div class="detail">
+              <div class="detail-label">Customer</div>
+              <div class="detail-value">{{ selectedOrder.customerName }}</div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="detail">
+              <div class="detail-label">Phone</div>
+              <div class="detail-value">{{ selectedOrder.phone }}</div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="detail">
+              <div class="detail-label">Date</div>
+              <div class="detail-value">{{ getFormattedDate(selectedOrder.createdAt) }}</div>
+            </div>
+          </div>
+          <div class="col-12">
+            <div class="detail">
+              <div class="detail-label">Shipping Address</div>
+              <div class="detail-value">{{ selectedOrder.shippingAddress }}</div>
+            </div>
+          </div>
+        </div>
+
+        <h6 class="section-title mt-4">Items</h6>
+        <ul class="list-group items-list">
+          <li *ngFor="let item of selectedOrder.items" class="list-group-item d-flex justify-content-between align-items-center">
+            <div>
+              <div class="fw-semibold">{{ item.productName }}</div>
+              <div class="text-muted small">{{ item.description }}</div>
+              <div class="text-muted small">Qty: {{ item.quantity }} × ₹ {{ item.price.toFixed(2) }}</div>
+            </div>
+            <span class="fw-bold">₹ {{ (item.price * item.quantity).toFixed(2) }}</span>
+          </li>
+        </ul>
+
+        <div class="mt-3 text-end fw-bold">
+          Total: ₹ {{ getTotalAmount(selectedOrder).toFixed(2) }}
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline-secondary" (click)="closeModal()">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<app-admin-footer></app-admin-footer>

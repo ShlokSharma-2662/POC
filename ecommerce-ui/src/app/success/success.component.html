@@ -1,0 +1,27 @@
+<div class="success-wrapper">
+  <div class="success-card">
+    <div class="success-icon" aria-hidden="true">🎉</div>
+    <h2 class="title">Order Placed Successfully!</h2>
+    <p *ngIf="orderId" class="order-id">Your Order ID: <strong>{{ orderId }}</strong></p>
+    <p class="subtitle">We sent a confirmation to your email. You can track your order in My Orders.</p>
+    <div *ngIf="orderSummary?.items?.length" class="order-summary">
+      <div class="os-header">Order Summary</div>
+      <div class="os-list">
+        <div class="os-item" *ngFor="let it of orderSummary.items">
+          <img *ngIf="it.imageUrl" [src]="it.imageUrl" alt="" class="os-thumb" />
+          <div class="os-meta">
+            <div class="os-name">{{ it.name }}</div>
+            <div class="os-qty">Qty: {{ it.quantity }}</div>
+          </div>
+          <div class="os-price">${{ (it.price * it.quantity).toFixed(2) }}</div>
+        </div>
+      </div>
+      <div class="os-total">
+        <span>Total</span>
+        <strong>${{ orderSummary.total?.toFixed ? orderSummary.total.toFixed(2) : orderSummary.total }}</strong>
+      </div>
+    </div>
+    <a routerLink="/products" class="btn btn-primary continue-btn">Continue Shopping</a>
+  </div>
+</div>
+  

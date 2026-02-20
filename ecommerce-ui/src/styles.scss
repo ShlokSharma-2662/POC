@@ -1,0 +1,275 @@
+@import 'ngx-toastr/toastr';
+
+:root {
+  --primary-color: #0f172a;
+  --secondary-color: #64748b;
+  --accent-color: #e8f5e8;
+  --border-color: #e2e8f0;
+  --background-color: #f8f9fa;
+  --white: #ffffff;
+  --success-color: #22c55e;
+  --error-color: #ef4444;
+  --warning-color: #f59e0b;
+  --info-color: #3b82f6;
+
+  /* Z-Index System - Standardized Layering */
+  --z-background: 1;
+  --z-content: 2;
+  --z-sticky: 10;
+  --z-dropdown: 1000;
+  --z-navbar: 1010;
+  --z-modal-backdrop: 1040;
+  --z-modal: 1050;
+  --z-notification: 9999;
+  --z-toast: 99999;
+
+  /* Layout Dimensions */
+  --navbar-height: 64px;
+}
+
+// Global layout structure
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background-color: var(--background-color);
+  color: var(--primary-color);
+  line-height: 1.6;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+// Ensure proper layout for admin pages
+app-admin-navbar + * {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center; /* vertical align */
+  align-items: center;     /* horizontal align (optional) */
+}
+
+// Ensure footer sticks to bottom
+app-admin-footer {
+  margin-top: auto;
+  flex-shrink: 0;
+}
+
+a {
+  text-decoration: none;
+  color: var(--primary-color);
+  transition: color 0.2s ease;
+}
+
+a:hover {
+  color: var(--secondary-color);
+}
+
+.card {
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+  background: var(--white);
+  transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
+
+  &:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+  }
+}
+
+/* Form elements */
+.form-control, .form-select {
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--primary-color);
+  
+  &:focus {
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 0.2rem rgba(232, 245, 232, 0.25);
+  }
+}
+
+/* Buttons */
+.btn-primary {
+  background-color: var(--primary-color);
+  border-color: var(--primary-color);
+  border-radius: 8px;
+  
+  &:hover {
+    background-color: var(--secondary-color);
+    border-color: var(--secondary-color);
+  }
+}
+
+.btn-outline-primary {
+  color: var(--primary-color);
+  border-color: var(--primary-color);
+  border-radius: 8px;
+  
+  &:hover {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+  }
+}
+
+/* Professional toast theme */
+.toast-container .ngx-toastr {
+  background: var(--white);
+  color: var(--primary-color);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 0.5rem 0.75rem; /* Reduced overall toast padding */
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+  opacity: 0.98;
+  max-width: 300px; /* Make toast a bit narrower */
+}
+
+.toast-container .toast-title { 
+  font-weight: 600; 
+  letter-spacing: 0.2px; 
+  color: var(--primary-color); 
+  font-size: 0.95rem; /* Smaller title */
+}
+
+.toast-container .toast-message { 
+  opacity: 0.9; 
+  color: var(--secondary-color); 
+  font-size: 0.85rem; /* Smaller message */
+}
+
+/* Variant accents */
+.toast-success { 
+  border-left: 4px solid var(--success-color) !important; 
+}
+
+.toast-error { 
+  border-left: 4px solid var(--error-color) !important; 
+}
+
+.toast-info { 
+  border-left: 4px solid var(--info-color) !important; 
+}
+
+.toast-warning { 
+  border-left: 4px solid var(--warning-color) !important; 
+}
+
+/* Progress bar subtle */
+.ngx-toastr-progress-bar { 
+  height: 2px; /* Slimmer progress bar */
+  background: var(--accent-color) !important; 
+  opacity: 0.9; 
+}
+
+/* Ensure toasts are fixed to the viewport top, above any sticky headers */
+.toast-container {
+  position: fixed !important;
+  z-index: var(--z-toast) !important;
+}
+
+.toast-top-right {
+  top: 80px !important;
+  right: 12px !important;
+}
+
+/* Close (cancel) button styling */
+.toast-container .toast-close-button {
+  color: var(--secondary-color) !important;
+  opacity: 0.8 !important;
+  text-shadow: none !important;
+  font-size: 0.9rem !important; /* Slightly smaller close button */
+  margin-top: -2px; /* Tighten spacing */
+}
+
+.toast-container .toast-close-button:hover {
+  color: var(--primary-color) !important;
+  opacity: 1 !important;
+}
+
+/* Badge styling */
+.badge {
+  background-color: var(--accent-color);
+  color: var(--primary-color);
+  font-weight: 500;
+  border-radius: 20px;
+  padding: 0.25rem 0.75rem;
+}
+
+/* Text utilities */
+.text-primary {
+  color: var(--primary-color) !important;
+}
+
+.text-secondary {
+  color: var(--secondary-color) !important;
+}
+
+.text-muted {
+  color: var(--secondary-color) !important;
+}
+
+/* Background utilities */
+.bg-light {
+  background-color: var(--background-color) !important;
+}
+
+.bg-white {
+  background-color: var(--white) !important;
+}
+
+.bg-light-green {
+  background-color: var(--accent-color) !important;
+}
+
+/* Responsive utilities */
+@media (max-width: 768px) {
+  .container {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+  
+  .table-responsive {
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  
+  /* Adjust toaster position for mobile navbar */
+  .toast-top-right {
+    top: 70px !important;
+    right: 8px !important;
+  }
+}
+
+@media (max-width: 576px) {
+  .container {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+  
+  /* Further adjust toaster position for very small screens */
+  .toast-top-right {
+    top: 65px !important;
+    right: 6px !important;
+  }
+}
+
+/* Global loader animations */
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Ensure loader z-index is above all other elements */
+app-loader {
+  z-index: var(--z-notification);
+}
+
+/* Clean admin table styling - no sticky positioning */
+.admin-nav + * .table {
+  margin-top: 1rem; /* Ensure proper spacing from navbar */
+}
+  

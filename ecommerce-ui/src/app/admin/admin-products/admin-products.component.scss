@@ -1,0 +1,83 @@
+// Ensure the component takes full height and footer stays at bottom
+:host {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  flex: 1;
+}
+
+.admin-products-header {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white;
+  padding: 1.5rem 0;
+  .header-content {
+    text-align: left;
+    .page-title { display: flex; align-items: center; gap: .5rem; margin: 0; font-weight: 800; }
+    .page-subtitle { margin: .25rem 0 0; opacity: .9; }
+  }
+}
+
+.filters .card-body { padding: 1rem; }
+.filters-grid {
+  display: grid;
+  grid-template-columns: 1fr 220px auto;
+  gap: .75rem;
+}
+@media (max-width: 768px) { .filters-grid { grid-template-columns: 1fr; } }
+
+/* Actions buttons: same size, spaced, themed */
+.actions-box { display: flex; justify-content: end; gap: 0.75rem; }
+.actions-box .btn { height: 40px; min-width: 150px; border-radius: 8px; font-weight: 600; }
+.actions-box .btn-primary { background: #a3a9b5; border-color: #a3a9b5; }
+.actions-box .btn-primary:hover { background: #8b92a0; border-color: #8b92a0; }
+
+.loading-section, .error-section, .empty-section {
+  display: grid; place-items: center; min-height: 240px; padding: 1.5rem;
+}
+.loading-content { text-align: center; }
+.spinner {
+  width: 48px; height: 48px; border: 4px solid #e5e7eb; border-top-color: #667eea; border-radius: 50%;
+  animation: spin 1s linear infinite; margin: 0 auto 1rem;
+}
+@keyframes spin { 0% { transform: rotate(0) } 100% { transform: rotate(360deg) } }
+
+.error-content { text-align: center; }
+.error-icon { font-size: 2rem; color: #ef4444; margin-bottom: .5rem; }
+
+.empty-content { text-align: center; }
+.empty-icon { font-size: 3rem; color: #cbd5e1; margin-bottom: .5rem; }
+
+/* Table polish */
+.table td, .table th { vertical-align: middle; }
+.products-table thead th { 
+  background: #f8f9fa !important; /* Ensure clean background */
+}
+
+/* Clean table styling - no sticky positioning */
+.products-table {
+  margin-top: 1rem; /* Add space from content above */
+  border: 1px solid #e5e7eb; /* Add border for clear separation */
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1); /* Subtle shadow for depth */
+}
+.products-table tbody tr:hover { background: #f8fafc; }
+.products-table { border-radius: 8px; overflow: hidden; }
+.thumb { width:48px;height:48px;object-fit:cover;border-radius:6px;border:1px solid #e5e7eb; }
+
+/* Chip badges for status */
+.chip-badge {
+  display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.2rem 0.55rem; border-radius: 999px;
+  font-weight: 600; font-size: 0.75rem; letter-spacing: 0.02em; border: 1px solid rgba(15, 23, 42, 0.08); color: #0f172a; background: #f1f5f9;
+}
+.status-chip { min-width: 110px; justify-content: center; }
+.chip-badge.is-active { background: #f2fbf7; color: #14532d; border-color: rgba(20, 83, 45, 0.12); }
+.chip-badge.is-deactivated { background: #f8fafc; color: #475569; border-color: rgba(71, 85, 105, 0.12); }
+
+/* Keep Delete/Restore width consistent */
+.action-toggle-btn { min-width: 100px; text-align: center; }
+
+/* Modal preview */
+.preview { width:96px;height:96px;object-fit:cover;border-radius:6px;border:1px solid #e5e7eb; }
+.confirm-icon { width:40px;height:40px;border-radius:10px;display:grid;place-items:center;background:#fff3f3;border:1px solid #fee2e2;color:#ef4444; }
+
+
+

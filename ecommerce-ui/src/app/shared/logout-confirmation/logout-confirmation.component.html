@@ -1,0 +1,27 @@
+<!-- Logout Confirmation Popup -->
+<div class="logout-popup-overlay" (click)="onCancel()">
+  <div class="logout-popup" (click)="$event.stopPropagation()">
+    <!-- Cute Icon -->
+    <div class="popup-icon">
+      <i class="fas fa-question-circle"></i>
+    </div>
+    
+    <!-- Popup Content -->
+    <div class="popup-content">
+      <h3 class="popup-title">Are you sure you want to logout?</h3>
+      <p class="popup-message">We'll miss you! 😢</p>
+    </div>
+    
+    <!-- Action Buttons -->
+    <div class="popup-actions">
+      <button class="btn btn-cancel" (click)="onCancel()">
+        <i class="fas fa-times"></i>
+        No, Stay
+      </button>
+      <button class="btn btn-confirm" (click)="onConfirm()">
+        <i class="fas fa-sign-out-alt"></i>
+        Yes, Logout
+      </button>
+    </div>
+  </div>
+</div>

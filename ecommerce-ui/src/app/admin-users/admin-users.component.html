@@ -1,0 +1,245 @@
+<!-- Header Section -->
+<div class="admin-users-header">
+  <div class="container">
+    <div class="header-content">
+      <h1 class="page-title">
+        <i class="fas fa-users"></i>
+        Manage Users
+      </h1>
+      <p class="page-subtitle">Manage user accounts, roles, and permissions</p>
+    </div>
+  </div>
+</div>
+
+<div class="container min-vh-100">
+  <!-- Filters / Actions -->
+  <div class="filters card shadow-sm mb-3">
+    <div class="card-body">
+      <div class="filters-grid">
+        <div class="search-box">
+          <div class="input-group">
+            <span class="input-group-text"><i class="fas fa-search"></i></span>
+            <input class="form-control" placeholder="Search name, email, username" [(ngModel)]="searchTerm" (input)="loadUsers()">
+          </div>
+        </div>
+        <div class="role-box">
+          <select class="form-select" [(ngModel)]="roleFilter" (change)="loadUsers()">
+            <option value="">All Roles</option>
+            <option value="Admin">Admin</option>
+            <option value="User">User</option>
+          </select>
+        </div>
+        <div class="status-box">
+          <select class="form-select" [(ngModel)]="statusFilter" (change)="loadUsers()">
+            <option value="">All Status</option>
+            <option value="Active">Active</option>
+            <option value="Deactivated">Deactivated</option>
+          </select>
+        </div>
+        <div class="actions-box">
+          <button class="btn btn-outline-secondary" (click)="clearFilters()" title="Clear filters">
+            <i class="fas fa-rotate"></i>
+            Clear
+          </button>
+          <button class="btn btn-outline-success" (click)="exportToCsv()" title="Export to CSV" [disabled]="!users || users.length === 0">
+            <i class="fas fa-download"></i>
+            Export CSV
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading State -->
+  <app-loader 
+    *ngIf="loading" 
+    message="Loading users..." 
+    subMessage="Please wait while we fetch the latest user data">
+  </app-loader>
+
+  <!-- Error State -->
+  <div *ngIf="!loading && errorMessage" class="error-section">
+    <div class="error-content">
+      <div class="error-icon"><i class="fas fa-exclamation-triangle"></i></div>
+      <h3>Unable to load users</h3>
+      <p>{{ errorMessage }}</p>
+      <button class="btn btn-primary" (click)="loadUsers()"><i class="fas fa-rotate"></i> Retry</button>
+    </div>
+  </div>
+
+  <!-- Empty State -->
+  <div *ngIf="!loading && !errorMessage && users.length === 0" class="empty-section">
+    <div class="empty-content">
+      <div class="empty-icon"><i class="fas fa-user-slash"></i></div>
+      <h3>No users found</h3>
+      <p>Try adjusting your filters or check back later</p>
+    </div>
+  </div>
+
+  <!-- Success Message -->
+  <div *ngIf="successMessage" class="alert alert-success py-2">
+    <i class="fas fa-check-circle me-2"></i>
+    {{ successMessage }}
+  </div>
+
+  <!-- Users Table -->
+  <div class="table-responsive" *ngIf="!loading && !errorMessage && users.length > 0">
+    <table class="table table-hover align-middle users-table">
+      <thead class="table-light text-center">
+        <tr>
+          <th>ID</th>
+          <th>Username</th>
+          <th>Email</th>
+          <th>Role</th>
+          <th>Status</th>
+          <th>Created</th>
+          <th class="text-end">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let u of users" class="text-center">
+          <td>{{ u.id }}</td>
+          <td class="text-start fw-semibold">{{ u.username }}</td>
+          <td>{{ u.email }}</td>
+          <td>
+            <button class="chip-badge role-chip chip-toggle"
+                    [ngClass]="u.role==='Admin' ? 'is-admin' : 'is-user'"
+                    [disabled]="u.status==='Deactivated'"
+                    (click)="requestToggleRole(u)"
+                    [attr.title]="u.status==='Deactivated' ? 'User is deactivated' : 'Toggle role'">
+              {{ u.role }}
+            </button>
+          </td>
+          <td>
+            <button class="chip-badge status-chip chip-toggle"
+                    [ngClass]="u.status === 'Active' ? 'is-active' : 'is-deactivated'"
+                    (click)="requestToggleStatus(u)"
+                    [attr.title]="u.status==='Active' ? 'Click to deactivate' : 'Click to activate'">
+              {{ u.status }}
+            </button>
+          </td>
+          <td>{{ u.createdAt | date: 'short' }}</td>
+          <td>
+             <div class="d-flex gap-2 justify-content-end flex-wrap">
+              <button class="btn btn-outline-secondary btn-sm" (click)="openResetPassword(u)"
+                      [disabled]="u.status==='Deactivated'"
+                      [attr.title]="u.status==='Deactivated' ? 'User is deactivated' : 'Reset Password'">
+                <i class="fas fa-key"></i>
+                Reset Password
+              </button>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Pagination -->
+  <div class="d-flex justify-content-between align-items-center" *ngIf="!loading && !errorMessage && users.length > 0">
+    <div>Page {{ pageNumber }} of {{ getTotalPages() }}</div>
+    <div class="btn-group">
+      <button class="btn btn-outline-secondary" (click)="prevPage()" [disabled]="pageNumber===1">Prev</button>
+      <button class="btn btn-outline-secondary" (click)="nextPage()" [disabled]="pageNumber*pageSize>=totalCount">Next</button>
+    </div>
+  </div>
+</div>
+
+<!-- Assign Role Modal -->
+<div class="modal-backdrop-custom" *ngIf="selectedUser && modalMode==='assign'"></div>
+<div class="modal d-block" tabindex="-1" *ngIf="selectedUser && modalMode==='assign'">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="fas fa-user-tag me-2"></i>
+          Assign Role
+        </h5>
+        <button type="button" class="btn-close" (click)="closeModals()"></button>
+      </div>
+      <div class="modal-body">
+        <p>Update role for <strong>{{ selectedUser!.email }}</strong></p>
+        <select class="form-select" [(ngModel)]="newRole">
+          <option value="Admin">Admin</option>
+          <option value="User">User</option>
+        </select>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline-secondary" (click)="closeModals()">Cancel</button>
+        <button class="btn btn-primary" (click)="confirmAssignRole()">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Reset Password Modal -->
+<div class="modal-backdrop-custom" *ngIf="selectedUser && modalMode==='reset'"></div>
+<div class="modal d-block" tabindex="-1" *ngIf="selectedUser && modalMode==='reset'">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="fas fa-key me-2"></i>
+          Reset Password
+        </h5>
+        <button type="button" class="btn-close" (click)="closeModals()"></button>
+      </div>
+      <div class="modal-body">
+        <p>Enter a new password for <strong>{{ selectedUser!.email }}</strong></p>
+        <input type="password" class="form-control" placeholder="New password" [(ngModel)]="newPassword">
+        <small class="text-muted">Use at least 8 characters.</small>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline-secondary" (click)="closeModals()">Cancel</button>
+        <button class="btn btn-primary" (click)="confirmResetPassword()" [disabled]="newPassword.length<8">Reset</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Deactivate Modal -->
+<div class="modal-backdrop-custom" *ngIf="selectedUser && modalMode==='deactivate'"></div>
+<div class="modal d-block" tabindex="-1" *ngIf="selectedUser && modalMode==='deactivate'">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="fas fa-user-slash me-2"></i>
+          Deactivate User
+        </h5>
+        <button type="button" class="btn-close" (click)="closeModals()"></button>
+      </div>
+      <div class="modal-body">
+        <p>Are you sure you want to deactivate <strong>{{ selectedUser!.email }}</strong>?</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline-secondary" (click)="closeModals()">Cancel</button>
+        <button class="btn btn-danger" (click)="confirmDeactivate()">Deactivate</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Activate Modal -->
+<div class="modal-backdrop-custom" *ngIf="selectedUser && modalMode==='activate'"></div>
+<div class="modal d-block" tabindex="-1" *ngIf="selectedUser && modalMode==='activate'">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="fas fa-user-check me-2"></i>
+          Activate User
+        </h5>
+        <button type="button" class="btn-close" (click)="closeModals()"></button>
+      </div>
+      <div class="modal-body">
+        <p>Activate <strong>{{ selectedUser!.email }}</strong>?</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline-secondary" (click)="closeModals()">Cancel</button>
+        <button class="btn btn-success" (click)="confirmActivate()">Activate</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<app-admin-footer></app-admin-footer>

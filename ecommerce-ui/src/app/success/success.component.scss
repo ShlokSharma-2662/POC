@@ -1,0 +1,126 @@
+/* Theming pulls from Bootstrap variables already used across the app */
+
+.success-wrapper {
+  min-height: calc(100vh - 64px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+  background: linear-gradient(180deg, rgba(25,135,84,0.06), rgba(13,110,253,0.03));
+}
+
+.success-card {
+  width: 100%;
+  max-width: 680px;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 12px 30px rgba(0,0,0,0.08);
+  padding: 2.25rem 2rem;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.success-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(1000px 300px at 100% -10%, rgba(25,135,84,0.08), transparent),
+              radial-gradient(800px 240px at -10% 100%, rgba(13,110,253,0.06), transparent);
+  pointer-events: none;
+}
+
+.success-icon {
+  font-size: 3rem;
+  line-height: 1;
+  width: 72px;
+  height: 72px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(25,135,84,0.1);
+  color: #198754;
+  margin-bottom: 1rem;
+  animation: popIn 600ms ease-out both;
+}
+
+.title {
+  color: #198754;
+  font-weight: 700;
+  margin-bottom: .5rem;
+}
+
+.order-id {
+  margin: 0 auto 0.5rem;
+  color: #0b2239;
+}
+
+.subtitle {
+  color: #6c757d;
+  margin-bottom: 1.5rem;
+}
+
+.continue-btn {
+  padding: 0.625rem 1.25rem;
+  border-radius: 999px;
+  background: #6e89a4;
+  border: none;
+  box-shadow: 0 6px 16px rgba(13,110,253,0.25);
+  transition: transform .12s ease, box-shadow .12s ease;
+}
+
+.continue-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 22px rgba(13,110,253,0.28);
+}
+
+@keyframes popIn {
+  0% { transform: scale(.6); opacity: 0; }
+  60% { transform: scale(1.05); opacity: 1; }
+  100% { transform: scale(1); }
+}
+
+/* Order Summary Card */
+.order-summary {
+  margin: 1.25rem auto 1.5rem;
+  text-align: left;
+  background: #fff;
+  border-radius: 12px;
+  border: 1px solid #eef2f7;
+  box-shadow: 0 8px 18px rgba(0,0,0,.05);
+  overflow: hidden;
+}
+
+.os-header {
+  font-weight: 700;
+  padding: .9rem 1rem;
+  border-bottom: 1px solid #eef2f7;
+}
+
+.os-list { padding: .25rem .5rem; }
+
+.os-item {
+  display: grid;
+  grid-template-columns: 48px 1fr auto;
+  align-items: center;
+  gap: .75rem;
+  padding: .6rem .6rem;
+  border-bottom: 1px solid #f3f5f8;
+}
+
+.os-item:last-child { border-bottom: 0; }
+
+.os-thumb { width: 48px; height: 48px; object-fit: cover; border-radius: 8px; border: 1px solid #e9eef5; }
+
+.os-meta { display: flex; flex-direction: column; }
+.os-name { font-weight: 600; color: #0b2239; }
+.os-qty { font-size: .85rem; color: #6c757d; }
+
+.os-price { font-weight: 700; color: #0b2239; }
+
+.os-total {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: .9rem 1rem; border-top: 1px solid #eef2f7; font-weight: 700;
+}
+

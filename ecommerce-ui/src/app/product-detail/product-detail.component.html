@@ -1,0 +1,49 @@
+<!-- Angular Modal -->
+<div class="modal-overlay" *ngIf="isModalVisible" (click)="onBackdropClick($event)">
+  <div class="modal-dialog modal-mb modal-dialog-centered" (click)="$event.stopPropagation()">
+    <div class="modal-content" *ngIf="product">
+      <div class="modal-header">
+        <h5 class="modal-title">{{product.name}}</h5>
+        <button type="button" class="btn-close" (click)="closeModal()" aria-label="Close">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="product-image-container">
+          <img [src]="product.imageUrl" class="product-image" [alt]="product.name">
+        </div>
+        <div class="product-info">
+          <p class="product-description">{{product.description}}</p>
+          <div class="price-section">
+            <h4 class="product-price">$ {{product.price}}</h4>
+            <span class="category-badge">{{product.categoryName}}</span>
+          </div>
+          <p class="stock-info"><strong>Stock Available:</strong> {{product.stock}}</p>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <div class="d-flex align-items-center justify-content-between w-100">
+          <!-- Close Button -->
+          <button type="button" class="btn btn-secondary" (click)="closeModal()">Close</button>
+          
+          <!-- Quantity Selector -->
+          <div class="quantity-selector d-flex align-items-center">
+            <button class="btn btn-sm qty-btn" (click)="decreaseQty()">−</button>
+            <input type="number"
+                   [(ngModel)]="quantity"
+                   min="1"
+                   class="form-control text-center qty-input"
+                   [max]="product.stock"
+                   (blur)="validateQuantity()" style="width: 60px;"/>
+            <button class="btn btn-sm qty-btn" (click)="increaseQty()">+</button>
+          </div>
+        
+          <!-- Add to Cart Button -->
+          <button class="btn add-cart-btn" [disabled]="quantity > product.stock || quantity < 1" (click)="addToCart()">
+            <strong>Add to Cart</strong>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

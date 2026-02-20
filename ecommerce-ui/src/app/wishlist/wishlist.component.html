@@ -1,0 +1,243 @@
+<div class="wishlist-page">
+  <!-- Header Section -->
+  <div class="wishlist-header">
+    <div class="container">
+      <div class="header-content">
+        <h1 class="page-title">
+          <i class="fas fa-heart"></i>
+          My Wishlist
+        </h1>
+        <p class="page-subtitle">
+          Save your favorite products and get notified when they're back in stock
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading State -->
+  <app-loader 
+    *ngIf="loading" 
+    message="Loading your wishlist..." 
+    subMessage="Please wait while we fetch your saved items">
+  </app-loader>
+
+  <!-- Empty State -->
+  <div *ngIf="!loading && getTotalWishlistCount() === 0" class="empty-wishlist">
+    <div class="empty-content">
+      <div class="empty-icon">
+        <i class="fas fa-heart-broken"></i>
+      </div>
+      <h2>Your Wishlist is Empty</h2>
+      <p>Start adding products to your wishlist to save them for later</p>
+      <button class="browse-btn" routerLink="/products">
+        <i class="fas fa-shopping-bag"></i>
+        Browse Products
+      </button>
+    </div>
+  </div>
+
+  <!-- Wishlist Items -->
+  <div *ngIf="!loading && getTotalWishlistCount() > 0" class="wishlist-content">
+    <div class="container">
+      <!-- Wishlist Stats -->
+      <div class="wishlist-stats">
+        <div class="stat-item">
+          <span class="stat-number">{{ getTotalWishlistCount() }}</span>
+          <span class="stat-label">Items</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-number">{{ inStockCount }}</span>
+          <span class="stat-label">In Stock</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-number">{{ outOfStockCount }}</span>
+          <span class="stat-label">Out of Stock</span>
+        </div>
+      </div>
+
+      <!-- Wishlist Grid -->
+      <div class="wishlist-grid">
+        <!-- Authenticated User Items -->
+        <div class="wishlist-item" *ngFor="let item of wishlistItems">
+          <div class="item-card">
+            <!-- Product Image -->
+            <div class="product-image-section">
+              <img [src]="item.productImageUrl" [alt]="item.productName" class="product-image">
+              
+              <!-- Stock Badge -->
+              <div class="stock-badge" [class.in-stock]="item.isInStock" [class.out-of-stock]="!item.isInStock">
+                <i class="fas" [class.fa-check-circle]="item.isInStock" [class.fa-times-circle]="!item.isInStock"></i>
+                {{ item.isInStock ? 'In Stock' : 'Out of Stock' }}
+              </div>
+
+              <!-- Remove Button -->
+              <button class="remove-btn" (click)="removeFromWishlist(item.productId)" title="Remove from wishlist">
+                <i class="fas fa-times"></i>
+              </button>
+
+              <!-- Quick Actions Overlay -->
+              <div class="quick-actions">
+                <button class="quick-view-btn" (click)="viewProduct(item.productId)">
+                  <i class="fas fa-eye"></i>
+                  Quick View
+                </button>
+              </div>
+            </div>
+
+            <!-- Product Details -->
+            <div class="product-details">
+              <div class="product-category">
+                <span class="category-tag">{{ item.categoryName }}</span>
+              </div>
+
+              <h3 class="product-title" (click)="viewProduct(item.productId)">
+                {{ item.productName }}
+              </h3>
+
+              <p class="product-description">
+                {{ item.productDescription }}
+              </p>
+
+              <!-- Price Section -->
+              <div class="price-section">
+                <div class="price-info">
+                  <span class="current-price">${{ item.productPrice }}</span>
+                  <span *ngIf="hasDiscount(item.productPrice)" class="original-price">
+                    ${{ item.productPrice }}
+                  </span>
+                  <span *ngIf="hasDiscount(item.productPrice)" class="discount-badge">
+                    {{ getDiscountPercentage() }}% OFF
+                  </span>
+                </div>
+              </div>
+
+              <!-- Added Date -->
+              <div class="added-date">
+                <i class="fas fa-calendar-alt"></i>
+                Added on {{ getFormattedDate(item.addedAt) }}
+              </div>
+
+              <!-- Action Buttons -->
+              <div class="action-buttons">
+                <button 
+                  class="add-to-cart-btn" 
+                  [disabled]="!item.isInStock"
+                  (click)="addToCart(item.productId)"
+                >
+                  <i class="fas fa-shopping-cart"></i>
+                  {{ item.isInStock ? 'Add to Cart' : 'Out of Stock' }}
+                </button>
+
+                <button 
+                  class="move-to-cart-btn" 
+                  [disabled]="!item.isInStock"
+                  (click)="moveToCart(item.productId)"
+                >
+                  <i class="fas fa-arrow-right"></i>
+                  Move to Cart
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Guest User Items -->
+        <div class="wishlist-item" *ngFor="let item of guestWishlistItems">
+          <div class="item-card">
+            <!-- Product Image -->
+            <div class="product-image-section">
+              <img [src]="item.product.imageUrl" [alt]="item.product.name" class="product-image">
+              
+              <!-- Stock Badge -->
+              <div class="stock-badge" [class.in-stock]="item.product.stock > 0" [class.out-of-stock]="item.product.stock <= 0">
+                <i class="fas" [class.fa-check-circle]="item.product.stock > 0" [class.fa-times-circle]="item.product.stock <= 0"></i>
+                {{ item.product.stock > 0 ? 'In Stock' : 'Out of Stock' }}
+              </div>
+
+              <!-- Remove Button -->
+              <button class="remove-btn" (click)="removeFromWishlist(item.product.productId)" title="Remove from wishlist">
+                <i class="fas fa-times"></i>
+              </button>
+
+              <!-- Quick Actions Overlay -->
+              <div class="quick-actions">
+                <button class="quick-view-btn" (click)="viewProduct(item.product.productId)">
+                  <i class="fas fa-eye"></i>
+                  Quick View
+                </button>
+              </div>
+            </div>
+
+            <!-- Product Details -->
+            <div class="product-details">
+              <div class="product-category">
+                <span class="category-tag">{{ item.product.categoryName }}</span>
+              </div>
+
+              <h3 class="product-title" (click)="viewProduct(item.product.productId)">
+                {{ item.product.name }}
+              </h3>
+
+              <p class="product-description">
+                {{ item.product.description }}
+              </p>
+
+              <!-- Price Section -->
+              <div class="price-section">
+                <div class="price-info">
+                  <span class="current-price">${{ item.product.price }}</span>
+                  <span *ngIf="hasDiscount(item.product.price)" class="original-price">
+                    ${{ item.product.price }}
+                  </span>
+                  <span *ngIf="hasDiscount(item.product.price)" class="discount-badge">
+                    {{ getDiscountPercentage() }}% OFF
+                  </span>
+                </div>
+              </div>
+
+              <!-- Added Date -->
+              <div class="added-date">
+                <i class="fas fa-calendar-alt"></i>
+                Added on {{ getFormattedDate(item.addedAt) }}
+              </div>
+
+              <!-- Action Buttons -->
+              <div class="action-buttons">
+                <button 
+                  class="add-to-cart-btn" 
+                  [disabled]="item.product.stock <= 0"
+                  (click)="addToCart(item.product.productId)"
+                >
+                  <i class="fas fa-shopping-cart"></i>
+                  {{ item.product.stock > 0 ? 'Add to Cart' : 'Out of Stock' }}
+                </button>
+
+                <button 
+                  class="move-to-cart-btn" 
+                  [disabled]="item.product.stock <= 0"
+                  (click)="moveToCart(item.product.productId)"
+                >
+                  <i class="fas fa-arrow-right"></i>
+                  Move to Cart
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Wishlist Actions -->
+      <div class="wishlist-actions">
+        <button class="clear-wishlist-btn" (click)="clearWishlist()">
+          <i class="fas fa-trash"></i>
+          Clear Wishlist
+        </button>
+        
+        <button class="continue-shopping-btn" routerLink="/products">
+          <i class="fas fa-arrow-left"></i>
+          Continue Shopping
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

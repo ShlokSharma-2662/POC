@@ -1,0 +1,151 @@
+<!-- Loading Overlay -->
+<app-loader 
+  *ngIf="loading" 
+  [fullPage]="true"
+  message="Loading your profile..." 
+  subMessage="Please wait while we fetch your information">
+</app-loader>
+
+<div class="profile-container">
+  <!-- Header Section -->
+  <div class="profile-header">
+    <div class="container">
+      <div class="header-content">
+        <div class="header-icon">
+          <i class="fas fa-user-circle"></i>
+        </div>
+        <div class="header-text">
+          <h1>My Profile</h1>
+          <p>View and manage your account information</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Content -->
+  <div class="container">
+    <div class="profile-content">
+      <!-- Error Message -->
+      <div *ngIf="error" class="alert alert-danger" role="alert">
+        <i class="fas fa-exclamation-triangle me-2"></i>
+        {{ error }}
+        <button type="button" class="btn btn-sm btn-outline-danger ms-3" (click)="loadProfile()">
+          <i class="fas fa-redo me-1"></i>
+          Try Again
+        </button>
+      </div>
+
+      <!-- Profile Card -->
+      <div *ngIf="profile && !loading" class="profile-card">
+        <div class="card">
+          <div class="card-header">
+            <div class="profile-avatar">
+              <i class="fas fa-user"></i>
+            </div>
+                         <div class="profile-info">
+               <h2>{{ getFullName() }}</h2>
+               <p class="email">{{ profile.email }}</p>
+             </div>
+          </div>
+
+          <div class="card-body">
+            <div class="profile-details">
+              <div class="detail-section">
+                <h3>Personal Information</h3>
+                <div class="detail-grid">
+                  <div class="detail-item">
+                    <div class="detail-label">
+                      <i class="fas fa-user me-2"></i>
+                      First Name
+                    </div>
+                    <div class="detail-value">{{ profile.firstName }}</div>
+                  </div>
+                  <div class="detail-item">
+                    <div class="detail-label">
+                      <i class="fas fa-user me-2"></i>
+                      Last Name
+                    </div>
+                    <div class="detail-value">{{ profile.lastName }}</div>
+                  </div>
+                  <div class="detail-item">
+                    <div class="detail-label">
+                      <i class="fas fa-envelope me-2"></i>
+                      Email Address
+                    </div>
+                    <div class="detail-value">{{ profile.email }}</div>
+                  </div>
+                  <div class="detail-item">
+                    <div class="detail-label">
+                      <i class="fas fa-shield-alt me-2"></i>
+                      Account Role
+                    </div>
+                    <div class="detail-value">{{ getRoleDisplayName(profile.role) }}</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="detail-section">
+                <h3>Account Information</h3>
+                <div class="detail-grid">
+                  <div class="detail-item">
+                    <div class="detail-label">
+                      <i class="fas fa-calendar-plus me-2"></i>
+                      Member Since
+                    </div>
+                    <div class="detail-value">{{ getFormattedDate(profile.createdAt) }}</div>
+                  </div>
+                  <div class="detail-item">
+                    <div class="detail-label">
+                      <i class="fas fa-calendar-check me-2"></i>
+                      Last Updated
+                    </div>
+                    <div class="detail-value">{{ getFormattedDate(profile.updatedAt) }}</div>
+                  </div>
+                  <div class="detail-item">
+                    <div class="detail-label">
+                      <i class="fas fa-id-badge me-2"></i>
+                      User ID
+                    </div>
+                    <div class="detail-value">{{ profile.id }}</div>
+                  </div>
+                  <div class="detail-item">
+                    <div class="detail-label">
+                      <i class="fas fa-circle me-2"></i>
+                      Account Status
+                    </div>
+                    <div class="detail-value">
+                      <span class="badge" [ngClass]="getStatusBadgeClass(profile.status)">
+                        {{ profile.status }}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card-footer">
+            <div class="action-buttons">
+              <button class="btn btn-outline-primary" routerLink="/my-orders">
+                <i class="fas fa-box me-2"></i>
+                View My Orders
+              </button>
+              <button class="btn btn-outline-secondary" routerLink="/wishlist">
+                <i class="fas fa-heart me-2"></i>
+                My Wishlist
+              </button>
+              <button class="btn btn-outline-warning" routerLink="/change-password">
+                <i class="fas fa-key me-2"></i>
+                Change Password
+              </button>
+              <button class="btn btn-primary" routerLink="/home">
+                <i class="fas fa-home me-2"></i>
+                Back to Home
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

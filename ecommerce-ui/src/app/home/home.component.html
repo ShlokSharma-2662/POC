@@ -1,0 +1,120 @@
+<div class="home-page">
+  <!-- Enhanced Hero Section -->
+  <section class="hero">
+    <div class="hero-background">
+      <div class="hero-overlay"></div>
+    </div>
+    <div class="container">
+      <div class="hero-content">
+        <div class="hero-text">
+          <h1 class="hero-title">Discover Your Next Favorite Gadget</h1>
+          <p class="hero-subtitle">Top electronics, curated collections, and daily deals. Find the perfect tech companion for your lifestyle.</p>
+          <div class="hero-actions">
+            <button class="btn btn-primary" (click)="goToCategory(0)">
+              <i class="fas fa-shopping-bag"></i>
+              Shop Now
+            </button>
+            <a class="btn btn-outline" routerLink="/products">
+              <i class="fas fa-eye"></i>
+              Browse All
+            </a>
+          </div>
+        </div>
+        <div class="hero-visual">
+          <div class="hero-image-container">
+            <img src="/assets/images/ecommerce-bg.jpg" alt="Featured Products" class="hero-image">
+            <div class="floating-card card-1">
+              <i class="fas fa-mobile-alt"></i>
+              <span>Smartphones</span>
+            </div>
+            <div class="floating-card card-2">
+              <i class="fas fa-laptop"></i>
+              <span>Laptops</span>
+            </div>
+            <div class="floating-card card-3">
+              <i class="fas fa-headphones"></i>
+              <span>Audio</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Enhanced Categories Section -->
+  <section class="categories">
+    <div class="container">
+      <div class="section-header">
+        <h2>Browse by Category</h2>
+        <p>Find exactly what you're looking for</p>
+      </div>
+      
+      <!-- Loading State -->
+      <app-loader 
+        *ngIf="loading" 
+        message="Loading categories..." 
+        subMessage="Please wait while we fetch the latest categories">
+      </app-loader>
+      
+      <!-- Categories Grid -->
+      <div class="categories-grid" *ngIf="!loading">
+        <div class="category-card" *ngFor="let category of categories" (click)="goToCategory(category.id)">
+          <div class="category-icon">
+            <i [class]="getCategoryIcon(category.name)"></i>
+          </div>
+          <div class="category-content">
+            <h3 class="category-name">{{ category.name }}</h3>
+            <p class="category-description">{{ getCategoryDescription(category.name) }}</p>
+          </div>
+          <div class="category-arrow">
+            <i class="fas fa-arrow-right"></i>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Enhanced Highlights Section -->
+  <section class="highlights">
+    <div class="container">
+      <div class="highlights-grid">
+        <div class="highlight-card">
+          <div class="highlight-icon">
+            <i class="fas fa-shipping-fast"></i>
+          </div>
+          <div class="highlight-content">
+            <h3>Fast Delivery</h3>
+            <p>Get your orders delivered quickly and reliably within 2-3 business days.</p>
+          </div>
+        </div>
+        <div class="highlight-card">
+          <div class="highlight-icon">
+            <i class="fas fa-shield-alt"></i>
+          </div>
+          <div class="highlight-content">
+            <h3>Secure Payments</h3>
+            <p>Your transactions are encrypted and safe with our secure payment gateway.</p>
+          </div>
+        </div>
+        <div class="highlight-card">
+          <div class="highlight-icon">
+            <i class="fas fa-headset"></i>
+          </div>
+          <div class="highlight-content">
+            <h3>24/7 Support</h3>
+            <p>We're here to help, any time. Contact our support team whenever you need assistance.</p>
+          </div>
+        </div>
+        <div class="highlight-card">
+          <div class="highlight-icon">
+            <i class="fas fa-undo"></i>
+          </div>
+          <div class="highlight-content">
+            <h3>Easy Returns</h3>
+            <p>Not satisfied? Return your purchase within 30 days for a full refund.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>

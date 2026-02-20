@@ -1,0 +1,361 @@
+<div class="cart-page">
+  <!-- Header Section -->
+  <div class="cart-header">
+    <div class="container">
+      <div class="header-content">
+        <h1 class="page-title">
+          <i class="fas fa-shopping-cart"></i>
+          Shopping Cart
+        </h1>
+        <p class="page-subtitle">
+          Review your items and proceed to checkout
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading State -->
+  <div *ngIf="cartItems.length === 0" class="empty-cart">
+    <div class="empty-content">
+      <div class="empty-icon">
+        <i class="fas fa-shopping-bag"></i>
+      </div>
+      <h2>Your Cart is Empty</h2>
+      <p>Looks like you haven't added any items to your cart yet</p>
+      <button class="browse-btn" routerLink="/products">
+        <i class="fas fa-arrow-left"></i>
+        Continue Shopping
+      </button>
+    </div>
+  </div>
+
+  <!-- Cart Content -->
+  <div *ngIf="cartItems.length > 0" class="cart-content">
+    <div class="container">
+      <div class="cart-layout">
+        <!-- Cart Items Section -->
+        <div class="cart-items-section">
+          <div class="section-header">
+            <h2>Cart Items ({{ cartItems.length }})</h2>
+            <button class="clear-cart-btn" (click)="clearCart()" title="Clear all items">
+              <i class="fas fa-trash"></i>
+              Clear Cart
+            </button>
+          </div>
+
+          <div class="cart-items">
+            <div class="cart-item-card" *ngFor="let item of cartItems">
+              <!-- Product Image -->
+              <div class="product-image">
+                <img [src]="item.product.imageUrl" [alt]="item.product.name" class="item-image">
+                <div class="stock-badge" [class.in-stock]="item.product.stock > 0" [class.out-of-stock]="item.product.stock <= 0">
+                  {{ item.product.stock > 0 ? 'In Stock' : 'Out of Stock' }}
+                </div>
+              </div>
+
+              <!-- Product Details -->
+              <div class="product-details">
+                <h3 class="product-name">{{ item.product.name }}</h3>
+                <p class="product-description">{{ item.product.description }}</p>
+                <div class="product-category">
+                  <span class="category-tag">{{ item.product.categoryName || 'General' }}</span>
+                </div>
+              </div>
+
+              <!-- Quantity Controls -->
+              <div class="quantity-section">
+                <div class="quantity-controls">
+                  <button 
+                    class="qty-btn" 
+                    (click)="updateQuantity(item, item.quantity - 1)"
+                    [disabled]="item.quantity <= 1"
+                    title="Decrease quantity"
+                  >
+                    <i class="fas fa-minus"></i>
+                  </button>
+                  <span class="quantity-display">{{ item.quantity }}</span>
+                  <button 
+                    class="qty-btn" 
+                    (click)="updateQuantity(item, item.quantity + 1)"
+                    [disabled]="item.product.stock > 0 && item.quantity >= item.product.stock"
+                    title="Increase quantity"
+                  >
+                    <i class="fas fa-plus"></i>
+                  </button>
+                </div>
+                <div class="stock-info" *ngIf="item.product.stock > 0">
+                  <small>{{ item.product.stock }} available</small>
+                </div>
+              </div>
+
+              <!-- Price Section -->
+              <div class="price-section">
+                <div class="price-info">
+                  <span class="unit-price">${{ item.product.price }}</span>
+                  <span class="total-price">${{ (item.product.price * item.quantity).toFixed(2) }}</span>
+                </div>
+                <div class="price-breakdown" *ngIf="item.quantity > 1">
+                  <small>{{ item.quantity }} × ${{ item.product.price }}</small>
+                </div>
+              </div>
+
+              <!-- Remove Button -->
+              <div class="action-section">
+                <button 
+                  class="remove-btn" 
+                  (click)="removeFromCart(item.product.productId)"
+                  title="Remove from cart"
+                >
+                  <i class="fas fa-trash"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Order Summary Section -->
+        <div class="order-summary-section">
+          <div class="summary-card">
+            <h3 class="summary-title">
+              <i class="fas fa-receipt"></i>
+              Order Summary
+            </h3>
+
+            <div class="summary-items">
+              <div class="summary-item">
+                <span>Items ({{ cartItems.length }})</span>
+                <span>${{ getSubtotal() }}</span>
+              </div>
+              <div class="summary-item">
+                <span>Shipping</span>
+                <span class="free-shipping">FREE</span>
+              </div>
+              <div class="summary-item">
+                <span>Tax</span>
+                <span>${{ getTax() }}</span>
+              </div>
+            </div>
+
+            <div class="summary-divider"></div>
+
+            <div class="summary-total">
+              <span class="total-label">Total</span>
+              <span class="total-amount">${{ getTotal() }}</span>
+            </div>
+
+            <div class="summary-actions">
+              <button 
+                class="checkout-btn" 
+                (click)="openCheckoutModal()" 
+                [disabled]="cartItems.length === 0"
+              >
+                <i class="fas fa-lock"></i>
+                Proceed to Checkout
+              </button>
+
+              <button class="continue-shopping-btn" routerLink="/products">
+                <i class="fas fa-arrow-left"></i>
+                Continue Shopping
+              </button>
+            </div>
+
+            <!-- Security Badge -->
+            <div class="security-badge">
+              <i class="fas fa-shield-alt"></i>
+              <span>Secure Checkout</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Clear Cart Confirmation Modal -->
+<div class="modal-overlay" *ngIf="isClearCartModalVisible" (click)="onClearCartBackdropClick($event)"
+     style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: rgba(0,0,0,0.5); z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 1rem; box-sizing: border-box;">
+  <div class="modal-dialog modal-dialog-centered" (click)="$event.stopPropagation()"
+       style="max-width: 500px; width: 100%; max-height: 90vh; margin: 0; display: flex; flex-direction: column;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="fas fa-exclamation-triangle text-warning"></i>
+          Clear Cart
+        </h5>
+        <button type="button" class="btn-close" (click)="closeClearCartModal()">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <p>Are you sure you want to remove all items from your cart?</p>
+        <p class="text-muted small">This action cannot be undone.</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" (click)="closeClearCartModal()">Cancel</button>
+        <button type="button" class="btn btn-danger" (click)="confirmClearCart()">
+          <i class="fas fa-trash"></i>
+          Clear Cart
+        </button>
+      </div>
+    </div>
+  </div>
+</div>  
+
+<!-- Checkout + Payment Modal -->
+<div class="modal-overlay" *ngIf="isCheckoutModalVisible" (click)="onCheckoutBackdropClick($event)" 
+     style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: rgba(0,0,0,0.5); z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 1rem; box-sizing: border-box;">
+  <div class="modal-dialog modal-lg modal-dialog-centered" (click)="$event.stopPropagation()"
+       style="max-width: 800px; width: 100%; max-height: 95vh; margin: 0; display: flex; flex-direction: column;">
+    <div class="modal-content" style="display: flex; flex-direction: column; max-height: 100%; overflow: hidden; border-radius: 12px; box-shadow: 0 20px 40px rgba(0,0,0,0.18);">
+      <div class="modal-header" style="flex-shrink: 0; padding: 1rem;">
+        <h5 class="modal-title">Checkout</h5>
+        <button type="button" class="btn-close btn-close-white" (click)="closeCheckoutModal()">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      <div class="modal-body" style="flex: 1; overflow-y: auto; min-height: 0; padding: 1.5rem;">
+        <!-- Order Details -->
+        <div class="mb-4">
+          <h6 class="fw-bold mb-3" style="color: #0b2239; font-size: 1.1rem;">Order Summary</h6>
+          <ul class="list-group mb-3" style="border-radius: 10px; overflow: hidden;">
+            <li *ngFor="let item of cartItems" class="list-group-item d-flex justify-content-between align-items-center" 
+                style="border-color: #eef2f7; padding: 0.75rem 1rem;">
+              <span style="font-weight: 500;">{{ item.product.name }} × {{ item.quantity }}</span>
+              <span class="text-muted" style="font-weight: 600;">${{ (item.product.price * item.quantity).toFixed(2) }}</span>
+            </li>
+            <li class="list-group-item d-flex justify-content-between fw-bold" 
+                style="background-color: #f8f9fa; border-color: #eef2f7; padding: 1rem; font-size: 1.1rem;">
+              <span style="color: #0b2239;">Total:</span> 
+              <span style="color: #198754; font-size: 1.2rem;">${{ getTotal() }}</span>
+            </li>
+          </ul>
+        </div>
+
+        <!-- Shipping Info -->
+        <div class="row g-3 mb-4">
+          <div class="col-md-6">
+            <label class="form-label" style="font-weight: 600; color: #0b2239; margin-bottom: 0.5rem;">Full Name <span class="text-danger">*</span></label>
+            <input [(ngModel)]="fullName" name="fullName" class="form-control" placeholder="John Doe" required 
+                   style="border-radius: 10px; border-color: #e5e7eb; padding: 0.75rem; margin-bottom: 0.5rem;" />
+            <small class="text-danger" *ngIf="!fullName && fullName !== ''">Full name is required.</small>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" style="font-weight: 600; color: #0b2239; margin-bottom: 0.5rem;">Contact Number <span class="text-danger">*</span></label>
+            <input [(ngModel)]="phoneNumber" name="phoneNumber" class="form-control" placeholder="Enter 10-digit mobile" maxlength="14" inputmode="numeric" pattern="\\d{10}" required 
+                   style="border-radius: 10px; border-color: #e5e7eb; padding: 0.75rem; margin-bottom: 0.5rem;" />
+            <small class="text-danger" *ngIf="phoneNumber && !isValidPhone()">Please enter a valid 10-digit mobile number.</small>
+            <small class="text-danger" *ngIf="!phoneNumber && phoneNumber !== ''">Contact number is required.</small>
+          </div>
+          <div class="col-12">
+            <label class="form-label" style="font-weight: 600; color: #0b2239; margin-bottom: 0.5rem;">Address <span class="text-danger">*</span></label>
+            <textarea [(ngModel)]="address" name="address" rows="3" class="form-control" placeholder="Apartment, Street, City, ZIP" required 
+                      style="border-radius: 10px; border-color: #e5e7eb; padding: 0.75rem; margin-bottom: 0.5rem;"></textarea>
+            <small class="text-danger" *ngIf="!address && address !== ''">Address is required.</small>
+          </div>
+        </div>
+
+        <!-- Card Details Section -->
+        <div class="mb-4">
+          <h6 class="fw-bold mb-3" style="color: #0b2239; font-size: 1.1rem;">Payment Information</h6>
+          
+          <!-- Card Number -->
+          <div class="mb-3">
+            <label class="form-label" style="font-weight: 600; color: #0b2239; margin-bottom: 0.5rem;">Card Number <span class="text-danger">*</span></label>
+            <input [(ngModel)]="cardNumber" name="cardNumber" class="form-control" placeholder="1234 5678 9012 3456" required 
+                   maxlength="19" inputmode="numeric" pattern="[0-9\s]*" (input)="formatCardNumber($event)"
+                   style="border-radius: 10px; border-color: #e5e7eb; padding: 0.75rem; margin-bottom: 0.5rem;" />
+            <small class="text-danger" *ngIf="!cardNumber && cardNumber !== ''">Card number is required.</small>
+            <small class="text-danger" *ngIf="cardNumber && !isValidCardNumber()">Please enter a valid 16-digit card number.</small>
+          </div>
+          
+          <!-- Expiry and CVC -->
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label" style="font-weight: 600; color: #0b2239; margin-bottom: 0.5rem;">Expiry Date <span class="text-danger">*</span></label>
+              <input [(ngModel)]="cardExpiry" name="cardExpiry" class="form-control" placeholder="MM/YY" required 
+                     maxlength="5" inputmode="numeric" pattern="[0-9/]*" (input)="formatExpiryDate($event)"
+                     style="border-radius: 10px; border-color: #e5e7eb; padding: 0.75rem; margin-bottom: 0.5rem;" />
+              <small class="text-danger" *ngIf="!cardExpiry && cardExpiry !== ''">Expiry date is required.</small>
+              <small class="text-danger" *ngIf="cardExpiry && !isValidExpiryDate()">Please enter a valid expiry date (MM/YY).</small>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" style="font-weight: 600; color: #0b2239; margin-bottom: 0.5rem;">CVC <span class="text-danger">*</span></label>
+              <input [(ngModel)]="cardCvc" name="cardCvc" class="form-control" placeholder="123" required 
+                     maxlength="4" inputmode="numeric" pattern="[0-9]*" (input)="formatCvc($event)"
+                     style="border-radius: 10px; border-color: #e5e7eb; padding: 0.75rem; margin-bottom: 0.5rem;" />
+              <small class="text-danger" *ngIf="!cardCvc && cardCvc !== ''">CVC is required.</small>
+              <small class="text-danger" *ngIf="cardCvc && !isValidCvc()">Please enter a valid CVC (3-4 digits).</small>
+            </div>
+          </div>
+          
+          <!-- Postal Code -->
+          <div class="mb-3">
+            <label class="form-label" style="font-weight: 600; color: #0b2239; margin-bottom: 0.5rem;">Postal Code <span class="text-danger">*</span></label>
+            <input [(ngModel)]="postalCode" name="postalCode" class="form-control" placeholder="12345" required 
+                   maxlength="10" inputmode="numeric" pattern="[0-9]*" (input)="formatPostalCode($event)"
+                   style="border-radius: 10px; border-color: #e5e7eb; padding: 0.75rem; margin-bottom: 0.5rem;" />
+            <small class="text-danger" *ngIf="!postalCode && postalCode !== ''">Postal code is required.</small>
+            <small class="text-danger" *ngIf="postalCode && !isValidPostalCode()">Please enter a valid postal code (5-10 digits).</small>
+          </div>
+        </div>
+
+        <!-- Error Message -->
+        <div class="alert alert-danger" *ngIf="error" role="alert">
+          <i class="fas fa-exclamation-triangle me-2"></i>
+          {{ error }}
+        </div>
+      </div>
+      <div class="modal-footer" style="flex-shrink: 0; display: flex; justify-content: space-between; padding: 1.5rem; border-top: 1px solid #e5e7eb; background: #fff; border-bottom-left-radius: 12px; border-bottom-right-radius: 12px;">
+        <button type="button" class="btn btn-secondary" (click)="closeCheckoutModal()" 
+                style="border-radius: 999px; padding: 0.75rem 1.5rem; font-weight: 600;">Cancel</button>
+        <button type="button" class="btn btn-success" (click)="proceedToPayment()" [disabled]="submitting || !canProceed()"
+                style="background: #198754; border-color: #198754; border-radius: 999px; padding: 0.75rem 1.5rem; font-weight: 600; box-shadow: 0 6px 16px rgba(25,135,84,.25);">
+          <span *ngIf="!submitting">Proceed to Payment</span>
+          <span *ngIf="submitting">
+            <i class="fas fa-spinner fa-spin me-2"></i>
+            Processing...
+          </span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Payment Processing Loader -->
+<div class="payment-loader-overlay" *ngIf="isPaymentProcessing" 
+     style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.8); z-index: 10000; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(5px);">
+  <div class="payment-loader-content" 
+       style="background: white; border-radius: 20px; padding: 3rem 2rem; text-align: center; box-shadow: 0 20px 40px rgba(0,0,0,0.3); max-width: 400px; width: 90%; animation: slideInUp 0.5s ease-out;">
+    
+    <!-- Cute Payment Icon -->
+    <div class="payment-icon" style="margin-bottom: 1.5rem;">
+      <div class="credit-card-icon" 
+           style="width: 80px; height: 50px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 10px; margin: 0 auto; position: relative; box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);">
+        <div style="position: absolute; top: 8px; left: 12px; width: 20px; height: 3px; background: white; border-radius: 2px;"></div>
+        <div style="position: absolute; top: 15px; left: 12px; width: 15px; height: 2px; background: white; border-radius: 2px;"></div>
+        <div style="position: absolute; top: 20px; left: 12px; width: 25px; height: 2px; background: white; border-radius: 2px;"></div>
+        <div style="position: absolute; top: 25px; left: 12px; width: 10px; height: 2px; background: white; border-radius: 2px;"></div>
+        <div style="position: absolute; top: 30px; left: 12px; width: 18px; height: 2px; background: white; border-radius: 2px;"></div>
+      </div>
+    </div>
+
+    <!-- Animated Spinner -->
+    <div class="spinner-container" style="margin-bottom: 1.5rem;">
+      <div class="payment-spinner" 
+           style="width: 50px; height: 50px; border: 4px solid #f3f3f3; border-top: 4px solid #198754; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto;"></div>
+    </div>
+
+    <!-- Payment Message -->
+    <h4 style="color: #0b2239; font-weight: 600; margin-bottom: 0.5rem; font-size: 1.3rem;">Processing Payment</h4>
+    <p style="color: #6b7280; margin-bottom: 0; font-size: 1rem; line-height: 1.5;">
+      Please wait while we're confirming your payment...
+    </p>
+
+    <!-- Progress Dots -->
+    <div class="progress-dots" style="margin-top: 1.5rem; display: flex; justify-content: center; gap: 8px;">
+      <div class="dot" style="width: 8px; height: 8px; background: #198754; border-radius: 50%; animation: pulse 1.5s ease-in-out infinite;"></div>
+      <div class="dot" style="width: 8px; height: 8px; background: #198754; border-radius: 50%; animation: pulse 1.5s ease-in-out infinite 0.2s;"></div>
+      <div class="dot" style="width: 8px; height: 8px; background: #198754; border-radius: 50%; animation: pulse 1.5s ease-in-out infinite 0.4s;"></div>
+    </div>
+  </div>
+</div>

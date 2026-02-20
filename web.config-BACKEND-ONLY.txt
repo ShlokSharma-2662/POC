@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<configuration>
+  <location path="." inheritInChildApplications="false">
+    <system.webServer>
+      <handlers>
+        <add name="aspNetCore" path="*" verb="*" modules="AspNetCoreModuleV2" resourceType="Unspecified" />
+      </handlers>
+      <aspNetCore processPath="dotnet" 
+                  arguments=".\Ecommerce.API.dll" 
+                  stdoutLogEnabled="true" 
+                  stdoutLogFile=".\logs\stdout" 
+                  hostingModel="inprocess">
+        <environmentVariables>
+          <environmentVariable name="ASPNETCORE_ENVIRONMENT" value="Production" />
+        </environmentVariables>
+      </aspNetCore>
+      
+      <!-- IIS Timeout Settings -->
+      <httpRuntime executionTimeout="300" maxRequestLength="51200" />
+      
+      <!-- Request Timeout Settings -->
+      <serverRuntime executionTimeout="00:05:00" />
+      
+      <!-- Connection Timeout Settings -->
+      <httpProtocol>
+        <customHeaders>
+          <add name="X-Content-Type-Options" value="nosniff" />
+          <add name="X-Frame-Options" value="DENY" />
+        </customHeaders>
+      </httpProtocol>
+      
+      <!-- Compression Settings -->
+      <httpCompression>
+        <dynamicTypes>
+          <add mimeType="application/json" enabled="true" />
+          <add mimeType="application/javascript" enabled="true" />
+          <add mimeType="text/css" enabled="true" />
+          <add mimeType="text/html" enabled="true" />
+        </dynamicTypes>
+      </httpCompression>
+      
+      <!-- Security Settings -->
+      <security>
+        <requestFiltering>
+          <requestLimits maxAllowedContentLength="52428800" />
+        </requestFiltering>
+      </security>
+      
+      <!-- URL Rewriting Rules -->
+      <rewrite>
+        <rules>
+          <!-- Handle /home route by rewriting to root -->
+          <rule name="RewriteHomeToRoot" stopProcessing="true">
+            <match url="^home/?$" />
+            <action type="Rewrite" url="/" />
+          </rule>
+          
+          <!-- Handle SPA routing - rewrite all non-API requests to root -->
+          <rule name="SPAFallback" stopProcessing="true">
+            <match url=".*" />
+            <conditions logicalGrouping="MatchAll">
+              <add input="{REQUEST_FILENAME}" matchType="IsFile" negate="true" />
+              <add input="{REQUEST_FILENAME}" matchType="IsDirectory" negate="true" />
+              <add input="{REQUEST_URI}" pattern="^/api/" negate="true" />
+              <add input="{REQUEST_URI}" pattern="^/swagger" negate="true" />
+              <add input="{REQUEST_URI}" pattern="^/home" negate="true" />
+            </conditions>
+            <action type="Rewrite" url="/" />
+          </rule>
+        </rules>
+      </rewrite>
+    </system.webServer>
+  </location>
+</configuration>
+
+
+
+
+
+
+
+
+
+
+

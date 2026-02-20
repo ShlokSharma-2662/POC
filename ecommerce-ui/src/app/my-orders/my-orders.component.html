@@ -1,0 +1,299 @@
+<div class="orders-page">
+  <!-- Header Section -->
+  <div class="orders-header">
+    <div class="container">
+      <div class="header-content">
+        <div class="header-text">
+          <h1 class="page-title">
+            <i class="fas fa-shopping-bag"></i>
+            My Orders
+          </h1>
+          <p class="page-subtitle">
+            Track your orders and view order history
+          </p>
+        </div>
+        <div class="header-stats">
+          <div class="stat-card">
+            <div class="stat-icon">
+              <i class="fas fa-box"></i>
+            </div>
+            <div class="stat-content">
+              <span class="stat-number">{{ orders.length }}</span>
+              <span class="stat-label">Total Orders</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading State -->
+  <div *ngIf="loading" class="loading-section">
+    <div class="container">
+      <div class="loading-content">
+        <div class="spinner"></div>
+        <h3>Loading your orders...</h3>
+        <p>Please wait while we fetch your order history</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Error State -->
+  <div *ngIf="!loading && error" class="error-section">
+    <div class="container">
+      <div class="error-content">
+        <div class="error-icon">
+          <i class="fas fa-exclamation-triangle"></i>
+        </div>
+        <h3>Oops! Something went wrong</h3>
+        <p>{{ error }}</p>
+        <button class="retry-btn" (click)="ngOnInit()">
+          <i class="fas fa-refresh"></i>
+          Try Again
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Empty State -->
+  <div *ngIf="!loading && !error && orders.length === 0" class="empty-section">
+    <div class="container">
+      <div class="empty-content">
+        <div class="empty-icon">
+          <i class="fas fa-shopping-bag"></i>
+        </div>
+        <h3>No Orders Yet</h3>
+        <p>You haven't placed any orders yet. Start shopping to see your order history here.</p>
+        <button class="shop-now-btn" routerLink="/products">
+          <i class="fas fa-shopping-cart"></i>
+          Start Shopping
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Orders List -->
+  <div *ngIf="!loading && !error && orders.length > 0" class="orders-content">
+    <div class="container">
+      <div class="orders-grid">
+        <div class="order-card" *ngFor="let order of orders">
+          <!-- Order Header -->
+          <div class="order-header">
+            <div class="order-info">
+              <div class="order-id">
+                <span class="id-label">Order</span>
+                <span class="id-number">#{{ order.id }}</span>
+              </div>
+              <div class="order-date">
+                <i class="fas fa-calendar-alt"></i>
+                {{ order.createdAt | date:'EEE, dd MMM yyyy' }}
+              </div>
+            </div>
+            <div class="order-status">
+              <div class="status-badge" [class]="getStatusClass(order)">
+                <i [class]="getStatusIcon(order)"></i>
+                {{ getOrderStatus(order) }}
+              </div>
+            </div>
+          </div>
+
+          <!-- Customer Information -->
+          <div class="customer-info">
+            <div class="info-grid">
+              <div class="info-item">
+                <i class="fas fa-user"></i>
+                <span class="label">Customer:</span>
+                <span class="value">{{ order.customerName }}</span>
+              </div>
+              <div class="info-item">
+                <i class="fas fa-phone"></i>
+                <span class="label">Phone:</span>
+                <span class="value">{{ order.phone }}</span>
+              </div>
+              <div class="info-item">
+                <i class="fas fa-map-marker-alt"></i>
+                <span class="label">Address:</span>
+                <span class="value">{{ order.shippingAddress }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Order Items -->
+          <div class="order-items">
+            <div class="items-header">
+              <h4>Order Items</h4>
+              <span class="item-count">{{ order.items.length }} item{{ order.items.length > 1 ? 's' : '' }}</span>
+            </div>
+            
+            <div class="items-list">
+              <div class="item-card" *ngFor="let item of order.items">
+                <div class="item-image">
+                  <img *ngIf="item.imageUrl"
+                       [src]="item.imageUrl"
+                       [alt]="item.productName"
+                       (error)="onImageError($event)" />
+                  <div *ngIf="!item.imageUrl" class="image-placeholder">
+                    <i class="fas fa-box"></i>
+                  </div>
+                </div>
+                
+                <div class="item-details">
+                  <h5 class="item-name">{{ item.productName }}</h5>
+                  <div class="item-meta">
+                    <span class="quantity">
+                      <i class="fas fa-layer-group"></i>
+                      Qty: {{ item.quantity }}
+                    </span>
+                    <span class="price">
+                      <i class="fas fa-tag"></i>
+                      ₹{{ item.price }}
+                    </span>
+                  </div>
+                </div>
+                
+                <div class="item-total">
+                  <span class="total-amount">₹{{ getItemTotal(item.price, item.quantity) | number:'1.2-2' }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Order Summary -->
+          <div class="order-summary">
+            <div class="summary-grid">
+              <div class="summary-item">
+                <i class="fas fa-truck"></i>
+                <span class="label">Expected Delivery</span>
+                <span class="value">{{ getExpectedDate(order) }}</span>
+              </div>
+              <div class="summary-item">
+                <i class="fas fa-credit-card"></i>
+                <span class="label">Payment Method</span>
+                <span class="value">Credit Card</span>
+              </div>
+              <div class="summary-item total">
+                <i class="fas fa-receipt"></i>
+                <span class="label">Total Amount</span>
+                <span class="value">₹{{ getTotalAmount(order) | number:'1.2-2' }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Order Actions -->
+          <div class="order-actions">
+            <button class="view-details-btn" (click)="openOrderPopup(order)">
+              <i class="fas fa-eye"></i>
+              View Details
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Order Details Modal -->
+  <div class="modal fade" id="orderModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <div class="modal-title-section">
+            <h5 class="modal-title">
+              <i class="fas fa-file-alt"></i>
+              Order Details
+            </h5>
+            <div class="order-id-modal">#{{ selectedOrder?.id }}</div>
+          </div>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        
+        <div class="modal-body" *ngIf="selectedOrder">
+          <!-- Order Information -->
+          <div class="order-info-section">
+            <div class="info-grid">
+              <div class="info-card">
+                <div class="info-icon">
+                  <i class="fas fa-user"></i>
+                </div>
+                <div class="info-content">
+                  <label>Customer</label>
+                  <span>{{ selectedOrder.customerName }}</span>
+                </div>
+              </div>
+              
+              <div class="info-card">
+                <div class="info-icon">
+                  <i class="fas fa-phone"></i>
+                </div>
+                <div class="info-content">
+                  <label>Phone</label>
+                  <span>{{ selectedOrder.phone }}</span>
+                </div>
+              </div>
+              
+              <div class="info-card">
+                <div class="info-icon">
+                  <i class="fas fa-map-marker-alt"></i>
+                </div>
+                <div class="info-content">
+                  <label>Shipping Address</label>
+                  <span>{{ selectedOrder.shippingAddress }}</span>
+                </div>
+              </div>
+              
+              <div class="info-card">
+                <div class="info-icon">
+                  <i class="fas fa-calendar"></i>
+                </div>
+                <div class="info-content">
+                  <label>Order Date</label>
+                  <span>{{ selectedOrder.createdAt | date: 'medium' }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Order Items -->
+          <div class="order-items-section">
+            <h6 class="section-title">
+              <i class="fas fa-shopping-cart"></i>
+              Order Items
+            </h6>
+            
+            <div class="modal-items-list">
+              <div class="modal-item" *ngFor="let item of selectedOrder.items">
+                <div class="modal-item-image">
+                  <img *ngIf="item.imageUrl"
+                       [src]="item.imageUrl"
+                       [alt]="item.productName"
+                       (error)="onImageError($event)" />
+                  <div *ngIf="!item.imageUrl" class="modal-image-placeholder">
+                    <i class="fas fa-box"></i>
+                  </div>
+                </div>
+                
+                <div class="modal-item-details">
+                  <h6 class="modal-item-name">{{ item.productName }}</h6>
+                  <div class="modal-item-meta">
+                    <span class="modal-quantity">Quantity: {{ item.quantity }}</span>
+                    <span class="modal-unit-price">Unit Price: ₹{{ item.price }}</span>
+                  </div>
+                </div>
+                
+                <div class="modal-item-total">
+                  <span class="modal-total-amount">₹{{ (item.price * item.quantity).toFixed(2) }}</span>
+                </div>
+              </div>
+            </div>
+            
+            <div class="modal-total-section">
+              <div class="modal-total-row">
+                <span class="modal-total-label">Total Amount</span>
+                <span class="modal-total-value">₹{{ getTotalAmount(selectedOrder).toFixed(2) }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,208 @@
+<div class="error-logs-container">
+  <div class="container my-4 min-vh-100">
+    <!-- Page Header -->
+    <div class="page-header mb-4">
+      <h2 class="text-danger">
+        <i class="fas fa-exclamation-triangle me-2"></i>
+        Error Logs
+      </h2>
+      <p class="text-muted">Monitor and manage system errors</p>
+    </div>
+
+    <!-- Controls -->
+    <div class="controls-section mb-4">
+      <div class="row g-3 align-items-end">
+        <div class="col-lg-6 col-md-8 col-sm-12">
+          <label class="form-label">Search Errors</label>
+          <input type="text" class="form-control" placeholder="Search by message or path..." 
+                                   [(ngModel)]="searchTerm" (input)="onSearchChange()">
+        </div>
+        <div class="col-lg-2 col-md-4 col-sm-12">
+                      <button class="btn btn-outline-primary w-100" (click)="loadErrorLogs()" [disabled]="loading">
+            <i class="fas fa-refresh" [class.fa-spin]="loading"></i>
+            <span class="d-none d-sm-inline">Refresh</span>
+          </button>
+        </div>
+        <div class="col-lg-4 col-md-12 col-sm-12 text-end">
+          <small class="text-muted">
+            Total: {{ totalCount }} errors
+          </small>
+        </div>
+      </div>
+    </div>
+
+    <!-- Loading State -->
+    <app-loader 
+      *ngIf="loading" 
+      message="Loading error logs..." 
+      subMessage="Please wait while we fetch the latest error data">
+    </app-loader>
+
+    <!-- Error State -->
+    <div *ngIf="!loading && errorMessage" class="alert alert-danger" role="alert">
+      <i class="fas fa-exclamation-circle me-2"></i>
+      {{ errorMessage }}
+      <button class="btn btn-sm btn-outline-danger ms-2" (click)="loadErrorLogs()">
+        Try Again
+      </button>
+    </div>
+
+    <!-- Error Logs Table -->
+    <div *ngIf="!loading && !errorMessage" class="table-responsive">
+      <table class="table table-hover">
+        <thead class="table-light">
+          <tr>
+            <th class="d-none d-md-table-cell">Time</th>
+            <th class="d-none d-lg-table-cell">Path</th>
+            <th>Error Message</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let error of errorLogs; let i = index" [ngClass]="getRowClass(error)">
+            <td class="d-none d-md-table-cell">
+              <small>{{ error.timestamp | date:'MMM dd, HH:mm' }}</small>
+            </td>
+            <td class="d-none d-lg-table-cell">
+              <code class="text-muted">{{ error.path }}</code>
+            </td>
+            <td>
+              <div class="error-message-container">
+                <span class="error-text" [title]="error.message">
+                  {{ error.message }}
+                </span>
+                <small class="text-muted d-md-none d-block mt-1">
+                  {{ error.timestamp | date:'MMM dd, HH:mm' }}
+                </small>
+              </div>
+            </td>
+            <td>
+              <div class="btn-group btn-group-sm">
+                <button class="btn btn-outline-secondary" (click)="viewErrorDetails(error)" 
+                        title="View Details">
+                  <i class="fas fa-eye"></i>
+                </button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- Empty State -->
+      <div *ngIf="errorLogs.length === 0" class="text-center py-5">
+        <i class="fas fa-check-circle text-success" style="font-size: 3rem;"></i>
+        <h4 class="mt-3">No Errors Found</h4>
+        <p class="text-muted">Great! No errors match your current filters.</p>
+      </div>
+    </div>
+
+    <!-- Pagination -->
+    <nav *ngIf="!loading && !errorMessage && totalPages > 1" class="mt-4">
+      <div class="d-flex flex-column flex-md-row justify-content-between align-items-center">
+        <div class="text-muted mb-2 mb-md-0">
+          Showing {{ (currentPage - 1) * pageSize + 1 }} to 
+          {{ Math.min(currentPage * pageSize, totalCount) }} of 
+          {{ totalCount }} errors
+        </div>
+        <ul class="pagination pagination-sm mb-0">
+          <li class="page-item" [class.disabled]="currentPage === 1">
+            <button class="page-link" (click)="previousPage()">Previous</button>
+          </li>
+          <li class="page-item" *ngFor="let page of getPageNumbers()" [class.active]="page === currentPage">
+            <button class="page-link" (click)="goToPage(page)">{{ page }}</button>
+          </li>
+          <li class="page-item" [class.disabled]="currentPage >= totalPages">
+            <button class="page-link" (click)="nextPage()">Next</button>
+          </li>
+        </ul>
+      </div>
+    </nav>
+  </div>
+</div>
+
+<!-- Error Details Modal -->
+<div class="modal fade" id="errorDetailsModal" tabindex="-1" aria-labelledby="errorDetailsModalLabel" aria-hidden="true" (click)="onModalBackdropClick($event)">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="errorDetailsModalLabel">
+          <i class="fas fa-exclamation-triangle text-danger me-2"></i>
+          Error Details
+        </h5>
+        <button type="button" class="btn-close" (click)="closeErrorDetails()" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" *ngIf="selectedError">
+        <!-- Error Overview -->
+        <div class="row mb-4">
+          <div class="col-md-6">
+            <div class="card">
+              <div class="card-body">
+                <h6 class="card-title">Error Information</h6>
+                <div class="error-info">
+                  <div class="info-item">
+                    <div class="info-label">Error Message</div>
+                    <div class="info-value text-danger">{{ selectedError.message }}</div>
+                  </div>
+                  <div class="info-item">
+                    <div class="info-label">Severity</div>
+                    <div class="info-value">
+                      <span class="badge" [ngClass]="getSeverityClass(selectedError.severity)">
+                        {{ selectedError.severity }}
+                      </span>
+                    </div>
+                  </div>
+                  <div class="info-item">
+                    <div class="info-label">Timestamp</div>
+                    <div class="info-value">{{ selectedError.timestamp | date:'full' }}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="card">
+              <div class="card-body">
+                <h6 class="card-title">Request Details</h6>
+                <div class="request-info">
+                  <div class="info-item">
+                    <div class="info-label">Path</div>
+                    <div class="info-value">
+                      <code class="text-primary">{{ selectedError.path }}</code>
+                    </div>
+                  </div>
+                  <div class="info-item" *ngIf="selectedError.ipAddress">
+                    <div class="info-label">IP Address</div>
+                    <div class="info-value">{{ selectedError.ipAddress }}</div>
+                  </div>
+                  <div class="info-item" *ngIf="selectedError.userAgent">
+                    <div class="info-label">User Agent</div>
+                    <div class="info-value small text-muted">{{ selectedError.userAgent }}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Stack Trace -->
+        <div class="row" *ngIf="selectedError.stackTrace">
+          <div class="col-12">
+            <div class="card">
+              <div class="card-header">
+                <h6 class="card-title mb-0">Stack Trace</h6>
+              </div>
+              <div class="card-body p-0">
+                <pre class="stack-trace m-0">{{ selectedError.stackTrace }}</pre>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" (click)="closeErrorDetails()">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<app-admin-footer></app-admin-footer>

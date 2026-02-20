@@ -1,0 +1,24 @@
+<nav class="admin-nav">
+	<div class="container nav-inner">
+		<a class="brand" routerLink="/admin">
+			<span class="logo-badge"><i class="fas fa-tools"></i></span>
+			<span class="brand-name">Admin</span>
+		</a>
+
+		<div class="links" *ngIf="showMenus">
+			<a class="nav-link" routerLink="/admin" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Dashboard</a>
+			<button class="logout-btn" *ngIf="isLoggedIn" (click)="logout()">
+				<i class="fas fa-sign-out-alt"></i>
+				Logout
+			</button>
+		</div>
+	</div>
+</nav>
+
+<!-- Logout Confirmation Popup -->
+<app-logout-confirmation 
+  *ngIf="showLogoutConfirmation"
+  (confirm)="onLogoutConfirm()"
+  (cancel)="onLogoutCancel()">
+</app-logout-confirmation>
+  

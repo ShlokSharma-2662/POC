@@ -1,0 +1,223 @@
+<!-- Loading Overlay -->
+<app-loader 
+  *ngIf="loading" 
+  [fullPage]="true"
+  message="Signing you in..." 
+  subMessage="Please wait while we authenticate your account">
+</app-loader>
+
+<div class="login-container">
+  <!-- Enhanced Left Promo Section -->
+  <div class="promo-section">
+    <div class="promo-content">
+      <div class="promo-header">
+        <div class="brand-icon">
+          <i class="fas fa-shopping-bag"></i>
+        </div>
+        <h1>Welcome to E-Shop</h1>
+        <p class="description">
+          Your one-stop destination for premium electronics, gadgets, and cutting-edge technology. 
+          Discover amazing deals and shop with confidence.
+        </p>
+      </div>
+
+      <div class="features-grid">
+        <div class="feature-item">
+          <div class="feature-icon">
+            <i class="fas fa-shipping-fast"></i>
+          </div>
+          <div class="feature-content">
+            <h3>Fast Delivery</h3>
+            <p>Get your orders delivered quickly and reliably</p>
+          </div>
+        </div>
+
+        <div class="feature-item">
+          <div class="feature-icon">
+            <i class="fas fa-shield-alt"></i>
+          </div>
+          <div class="feature-content">
+            <h3>Secure Shopping</h3>
+            <p>Your transactions are encrypted and safe</p>
+          </div>
+        </div>
+
+        <div class="feature-item">
+          <div class="feature-icon">
+            <i class="fas fa-headset"></i>
+          </div>
+          <div class="feature-content">
+            <h3>24/7 Support</h3>
+            <p>We're here to help, any time</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="platform-info">
+        <div class="platform-badge">
+          <i class="fas fa-star"></i>
+          <span>Premium E-Commerce Platform</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Enhanced Right Login Section -->
+  <div class="login-card">
+    <div class="login-header">
+      <div class="logo-section">
+        <img src="assets/images/logo.png" alt="E-Commerce Logo" class="logo" />
+        <h2>Welcome Back</h2>
+        <p class="subtext">Sign in to your account to continue shopping</p>
+      </div>
+    </div>
+
+    <form [formGroup]="loginForm" (ngSubmit)="onSubmit()" class="login-form">
+      <div class="form-group">
+        <label for="email" class="form-label">
+          <i class="fas fa-envelope"></i>
+          Email Address
+        </label>
+        <input 
+          type="email" 
+          id="email"
+          formControlName="email" 
+          placeholder="Enter your email address"
+          class="form-input"
+        />
+      </div>
+
+      <div class="form-group">
+        <label for="password" class="form-label">
+          <i class="fas fa-lock"></i>
+          Password
+        </label>
+        <div class="password-field">
+          <input 
+            [type]="showPassword ? 'text' : 'password'" 
+            id="password"
+            formControlName="password" 
+            placeholder="Enter your password"
+            class="form-input"
+          />
+          <button 
+            type="button" 
+            class="toggle-password" 
+            (click)="showPassword = !showPassword" 
+            aria-label="Toggle password visibility"
+          >
+            <i [class]="showPassword ? 'fas fa-eye-slash' : 'fas fa-eye'"></i>
+          </button>
+        </div>
+      </div>
+
+      <div class="form-options">
+        <label class="checkbox-container">
+          <input type="checkbox" class="checkbox-input">
+          <span class="checkmark"></span>
+          Remember me
+        </label>
+        <a href="#" class="forgot-link" (click)="onForgotPassword($event)">Forgot Password?</a>
+      </div>
+
+      <button type="submit" class="login-btn" [disabled]="loginForm.invalid">
+        <i class="fas fa-sign-in-alt"></i>
+        <span>Sign In</span>
+      </button>
+
+      <div *ngIf="error" class="error-message">
+        <i class="fas fa-exclamation-circle"></i>
+        {{ error }}
+      </div>
+    </form>
+
+    <div class="divider">
+      <span>or</span>
+    </div>
+
+    <div class="social-login">
+      <button class="social-btn microsoft-btn" (click)="onOAuthLogin()">
+        <i class="fab fa-microsoft"></i>
+        Continue with Microsoft
+      </button>
+      <button class="social-btn google-btn" (click)="onGoogleOAuthLogin()">
+        <i class="fab fa-google"></i>
+        Continue with Google
+      </button>
+    </div>
+
+    <div class="register-section">
+      <p>Don't have an account? <a href="/register" class="register-link">Create one now</a></p>
+    </div>
+
+    <footer class="login-footer">
+      <div class="footer-links">
+        <a href="#">Privacy Policy</a>
+        <span class="separator">•</span>
+        <a href="#">Terms of Service</a>
+        <span class="separator">•</span>
+        <a href="#">Contact Support</a>
+      </div>
+      <p class="footer-text">
+        © 2025 E-Shop. Developed with <i class="fas fa-heart"></i> using Angular & .NET
+      </p>
+    </footer>
+  </div>
+</div>
+
+<!-- Forgot Password Modal -->
+<div class="modal-overlay" *ngIf="showForgotPasswordModal" (click)="closeForgotPasswordModal()">
+  <div class="modal-content" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <div class="modal-icon">
+        <i class="fas fa-key"></i>
+      </div>
+      <h3>Forgot Password?</h3>
+      <button class="close-btn" (click)="closeForgotPasswordModal()">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+    
+    <div class="modal-body">
+      <p>To change your password, you need to be logged in to your account.</p>
+      <p>Here's what you can do:</p>
+      
+      <div class="help-steps">
+        <div class="step">
+          <div class="step-number">1</div>
+          <div class="step-content">
+            <strong>Try logging in</strong>
+            <p>Make sure you're using the correct email and password</p>
+          </div>
+        </div>
+        
+        <div class="step">
+          <div class="step-number">2</div>
+          <div class="step-content">
+            <strong>Once logged in</strong>
+            <p>Go to your profile page and click "Change Password"</p>
+          </div>
+        </div>
+        
+        <div class="step">
+          <div class="step-number">3</div>
+          <div class="step-content">
+            <strong>Still having trouble?</strong>
+            <p>Contact our support team for assistance</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="modal-footer">
+      <button class="btn btn-secondary" (click)="closeForgotPasswordModal()">
+        <i class="fas fa-arrow-left"></i>
+        Back to Login
+      </button>
+      <button class="btn btn-primary" (click)="onContactSupport()">
+        <i class="fas fa-headset"></i>
+        Contact Support
+      </button>
+    </div>
+  </div>
+</div>

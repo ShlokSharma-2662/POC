@@ -1,0 +1,10 @@
+<!-- Admin Navbar for admin users -->
+<app-admin-navbar *ngIf="isLoggedIn && isAdmin"></app-admin-navbar>
+
+<!-- Regular Navbar for all users (guest and logged-in) except on login/register pages -->
+<app-navbar *ngIf="!isLoginPage && !(isLoggedIn && isAdmin)"></app-navbar>
+
+<router-outlet></router-outlet>
+
+<!-- Rate Limiting Notification -->
+<app-rate-limit-notification></app-rate-limit-notification>

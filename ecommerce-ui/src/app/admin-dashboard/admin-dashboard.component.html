@@ -1,0 +1,142 @@
+<!-- Hero / Page Header -->
+<section class="admin-hero">
+  <div class="container">
+    <div class="row align-items-center">
+      <div class="col-lg-8">
+        <h2 class="admin-title text-white mb-2">Admin Dashboard</h2>
+        <p class="lead text-white-75 mb-3">Control your storefront, monitor performance, and keep operations running smoothly.</p>
+        <div class="d-flex gap-2 flex-wrap hero-ctas">
+          <a routerLink="/admin/orders" class="btn btn-light hero-cta">View Orders</a>
+          <a routerLink="/admin/performance" class="btn btn-outline-light">Performance</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Stats Summary -->
+<div class="container section-spacing">
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-icon bg-orders"><i class="fas fa-shopping-cart"></i></div>
+      <div class="stat-content">
+        <div class="stat-label">Total Orders</div>
+        <div class="stat-value">{{ loadingOrders ? '—' : (ordersCount | number) }}</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon bg-revenue"><i class="fas fa-dollar-sign"></i></div>
+      <div class="stat-content">
+        <div class="stat-label">Revenue</div>
+        <div class="stat-value">{{ loadingRevenue ? '—' : (revenue | currency:'INR':'symbol':'1.0-0') }}</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon bg-users"><i class="fas fa-users"></i></div>
+      <div class="stat-content">
+        <div class="stat-label">Active Users</div>
+        <div class="stat-value">{{ loadingUsers ? '—' : (usersCount | number) }}</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon bg-errors"><i class="fas fa-exclamation-triangle"></i></div>
+      <div class="stat-content">
+        <div class="stat-label">Errors (24h)</div>
+        <div class="stat-value">{{ loadingErrors ? '—' : (errors24h | number) }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Quick Actions / Management Cards -->
+<div class="container section-spacing">
+  <h5 class="section-title text-uppercase text-muted mb-3">Management</h5>
+  <div class="row g-4">
+    <div class="col-sm-6 col-lg-4">
+      <div class="card action-card h-100">
+        <div class="card-body">
+          <div class="card-icon bg-gradient-primary-subtle text-primary">🛍️</div>
+          <h5 class="card-title">Manage Products</h5>
+          <p class="card-text">Add, edit, or remove items in your catalog to keep inventory fresh.</p>
+        </div>
+        <div class="card-footer bg-transparent border-0">
+          <a routerLink="/admin/products" class="stretched-link open-btn w-100">Open</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-sm-6 col-lg-4">
+      <div class="card action-card h-100">
+        <div class="card-body">
+          <div class="card-icon bg-gradient-success-subtle text-success">📦</div>
+          <h5 class="card-title">View Orders</h5>
+          <p class="card-text">Track order progress, update statuses, and manage fulfillment.</p>
+        </div>
+        <div class="card-footer bg-transparent border-0">
+          <a routerLink="/admin/orders" class="stretched-link open-btn w-100">Open</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-sm-6 col-lg-4">
+      <div class="card action-card h-100">
+        <div class="card-body">
+          <div class="card-icon bg-gradient-info-subtle text-info">👥</div>
+          <h5 class="card-title">Manage Users</h5>
+          <p class="card-text">Assign roles, reset passwords, or deactivate users securely.</p>
+        </div>
+        <div class="card-footer bg-transparent border-0">
+          <a routerLink="/admin/users" class="stretched-link open-btn w-100">Open</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-sm-6 col-lg-4">
+      <div class="card action-card h-100">
+        <div class="card-body">
+          <div class="card-icon bg-gradient-success-subtle text-success">💰</div>
+          <h5 class="card-title">Revenue Reports</h5>
+          <p class="card-text">Analyze revenue trends, track performance, and generate detailed reports.</p>
+        </div>
+        <div class="card-footer bg-transparent border-0">
+          <a routerLink="/admin/revenue" class="stretched-link open-btn w-100">Open</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Monitoring & Reliability -->
+<div class="container section-spacing">
+  <h5 class="section-title text-uppercase text-muted mb-3">Monitoring & Reliability</h5>
+  <div class="row g-4">
+    <div class="col-sm-6 col-lg-4">
+      <div class="card action-card h-100">
+        <div class="card-body">
+          <div class="card-icon bg-gradient-warning-subtle text-warning">📈</div>
+          <h5 class="card-title">API Performance</h5>
+          <p class="card-text">Track latency and response times across key endpoints.</p>
+        </div>
+        <div class="card-footer bg-transparent border-0">
+          <a routerLink="/admin/performance" class="stretched-link open-btn w-100">Open</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-sm-6 col-lg-4">
+      <div class="card action-card h-100">
+        <div class="card-body">
+          <div class="card-icon bg-gradient-danger-subtle text-danger">🧯</div>
+          <h5 class="card-title">Error Logs</h5>
+          <p class="card-text">Investigate recent failures and exceptions to maintain stability.</p>
+        </div>
+        <div class="card-footer bg-transparent border-0">
+          <a routerLink="/admin/errors" class="stretched-link open-btn w-100">Open</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<app-admin-footer></app-admin-footer>
+

@@ -1,0 +1,198 @@
+<!-- Loading Overlay -->
+<app-loader 
+  *ngIf="loading" 
+  [fullPage]="true"
+  message="Creating your account..." 
+  subMessage="Please wait while we set up your profile">
+</app-loader>
+
+<div class="login-container">
+  <!-- Enhanced Left Promo Section -->
+  <div class="promo-section">
+    <div class="promo-content">
+      <div class="promo-header">
+        <div class="brand-icon">
+          <i class="fas fa-user-plus"></i>
+        </div>
+        <h1>Join E-Shop Today</h1>
+        <p class="description">
+          Create your account and unlock exclusive deals, personalized recommendations, and seamless shopping experience.
+        </p>
+      </div>
+      
+      <div class="features-grid">
+        <div class="feature-item">
+          <div class="feature-icon">
+            <i class="fas fa-shield-alt"></i>
+          </div>
+          <div class="feature-content">
+            <h3>Secure Registration</h3>
+            <p>Your data is protected with industry-standard security</p>
+          </div>
+        </div>
+        
+        <div class="feature-item">
+          <div class="feature-icon">
+            <i class="fas fa-gift"></i>
+          </div>
+          <div class="feature-content">
+            <h3>Welcome Bonus</h3>
+            <p>Get exclusive discounts on your first purchase</p>
+          </div>
+        </div>
+        
+        <div class="feature-item">
+          <div class="feature-icon">
+            <i class="fas fa-shipping-fast"></i>
+          </div>
+          <div class="feature-content">
+            <h3>Fast Delivery</h3>
+            <p>Quick and reliable shipping to your doorstep</p>
+          </div>
+        </div>
+      </div>
+      
+      <div class="platform-info">
+        <div class="platform-badge">
+          <i class="fas fa-star"></i>
+          <span>PREMIUM E-COMMERCE PLATFORM</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Enhanced Right Registration Form -->
+  <div class="login-card">
+    <div class="login-header">
+      <div class="logo-section">
+        <img src="assets/images/logo.png" alt="E-Commerce Logo" class="logo" />
+        <h2>Create Your Account</h2>
+        <p class="subtext">Join thousands of satisfied customers</p>
+      </div>
+    </div>
+
+    <form class="login-form" (ngSubmit)="onRegister()">
+      <div class="form-group">
+        <label class="form-label">
+          <i class="fas fa-user"></i>
+          First Name
+        </label>
+        <input 
+          type="text" 
+          class="form-input" 
+          placeholder="Enter your first name" 
+          [(ngModel)]="firstName" 
+          name="firstName" 
+          required 
+        />
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">
+          <i class="fas fa-user"></i>
+          Last Name
+        </label>
+        <input 
+          type="text" 
+          class="form-input" 
+          placeholder="Enter your last name" 
+          [(ngModel)]="lastName" 
+          name="lastName" 
+          required 
+        />
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">
+          <i class="fas fa-envelope"></i>
+          Email Address
+        </label>
+        <input 
+          type="email" 
+          class="form-input" 
+          placeholder="Enter your email address" 
+          [(ngModel)]="email" 
+          name="email" 
+          required 
+        />
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">
+          <i class="fas fa-lock"></i>
+          Password
+        </label>
+        <div class="password-field">
+          <input 
+            [type]="showPassword ? 'text' : 'password'" 
+            class="form-input" 
+            placeholder="Create a strong password" 
+            [(ngModel)]="password" 
+            name="password" 
+            required 
+          />
+          <button 
+            type="button" 
+            class="toggle-password" 
+            (click)="showPassword = !showPassword" 
+            aria-label="Toggle password visibility"
+          >
+            <i [class]="showPassword ? 'fas fa-eye-slash' : 'fas fa-eye'"></i>
+          </button>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">
+          <i class="fas fa-user-tag"></i>
+          Account Type
+        </label>
+        <select class="form-input" [(ngModel)]="role" name="role" required>
+          <option value="">Select account type</option>
+          <option value="User">Customer Account</option>
+          <option value="Admin">Administrator</option>
+        </select>
+      </div>
+
+      <button type="submit" class="login-btn" [disabled]="!firstName || !lastName || !email || !password || !role">
+        <i class="fas fa-user-plus"></i>
+        Create Account
+      </button>
+    </form>
+
+    <div class="divider">
+      <span>or</span>
+    </div>
+
+    <div class="social-login">
+      <button type="button" class="social-btn google-btn" (click)="onGoogleOAuthLogin()">
+        <i class="fab fa-google"></i>
+        Continue with Google
+      </button>
+      <button type="button" class="social-btn facebook-btn">
+        <i class="fab fa-facebook-f"></i>
+        Continue with Facebook
+      </button>
+    </div>
+
+    <div class="register-section">
+      <p>
+        Already have an account? 
+        <a routerLink="/login" class="register-link">Sign In</a>
+      </p>
+    </div>
+
+    <div class="login-footer">
+      <div class="footer-links">
+        <a href="#">Terms of Service</a>
+        <span class="separator">•</span>
+        <a href="#">Privacy Policy</a>
+        <span class="separator">•</span>
+        <a href="#">Contact Support</a>
+      </div>
+      <p class="footer-text">
+        © 2025 E-Shop. Made with <i class="fas fa-heart"></i> using Angular & .NET
+      </p>
+    </div>
+  </div>
+</div>
