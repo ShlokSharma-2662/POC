@@ -10,9 +10,11 @@ import { LoaderComponent } from '../shared/loader/loader.component';
 import { ApiResponse } from '../models/api-response.model';
 import { CsvExportService } from '../services/csv-export.service';
 import { ToastrService } from 'ngx-toastr';
+import { environment } from '../../environments/environment';
 
 declare var bootstrap: any;
 const token = localStorage.getItem('accessToken');
+const apiBase = environment.apiUrl;
 
 @Component({
   selector: 'app-admin-orders',
@@ -62,7 +64,7 @@ export class AdminOrdersComponent implements OnInit {
     const start = performance.now();
     this.http
       .get<ApiResponse<PagedResult<AdminOrder>>>(
-        'https://localhost:7273/api/admin/all-orders',
+        `${apiBase}/admin/all-orders`,
         { headers: { Authorization: `Bearer ${token}` }, params }
       )
       .subscribe({
@@ -109,7 +111,7 @@ export class AdminOrdersComponent implements OnInit {
 
     this.http
       .put<ApiResponse<any>>(
-        `https://localhost:7273/api/admin/orders/${orderId}/status`,
+        `${apiBase}/admin/orders/${orderId}/status`,
         { status: newStatus },
         {
           headers: {
@@ -150,7 +152,7 @@ export class AdminOrdersComponent implements OnInit {
 
     this.http
       .put<ApiResponse<any>>(
-        `https://localhost:7273/api/admin/orders/${this.pendingOrderId}/status`,
+        `${apiBase}/admin/orders/${this.pendingOrderId}/status`,
         { status: this.pendingStatus },
         {
           headers: {

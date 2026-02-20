@@ -159,7 +159,7 @@ export class CheckoutComponent implements OnInit {
 
     const start = performance.now();
     this.http
-      .post<any>('https://localhost:7273/api/orders/checkout', payload, {
+      .post<any>(`${environment.apiUrl}/orders/checkout`, payload, {
         headers,
       })
       .subscribe({

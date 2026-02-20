@@ -5,6 +5,7 @@ import { RouterModule } from '@angular/router';
 import { OrderDto } from '../models/order.model';
 import { MonitoringService } from '../services/monitoring.service';
 import { LoaderComponent } from '../shared/loader/loader.component';
+import { environment } from '../../environments/environment';
 declare var bootstrap: any;
 
 interface ApiResponse<T> {
@@ -42,7 +43,7 @@ export class MyOrdersComponent implements OnInit {
     this.error = null;
 
     this.http
-      .get<ApiResponse<OrderDto[]>>('https://localhost:7273/api/orders/my-orders', { headers })
+      .get<ApiResponse<OrderDto[]>>(`${environment.apiUrl}/orders/my-orders`, { headers })
       .subscribe({
         next: (response) => {
           this.orders = response.data ?? [];

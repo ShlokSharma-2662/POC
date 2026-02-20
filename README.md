@@ -113,6 +113,60 @@ Set `apiUrl` to your running backend host.
 
 ## 6. Running the Applications
 
+## 6.0 Run with Docker (full stack)
+
+1. Create your environment file:
+
+```powershell
+cd D:\POC_NEW\POC
+Copy-Item .env.example .env
+```
+
+2. Start all services (UI, API, SQL Server, Redis, RabbitMQ):
+
+```powershell
+docker compose up --build -d
+```
+
+3. Access endpoints:
+- UI: `http://localhost:4200`
+- API: `http://localhost:7273`
+- Swagger: `http://localhost:7273/swagger`
+- RabbitMQ management: `http://localhost:15672`
+
+4. Stop services:
+
+```powershell
+docker compose down
+```
+
+## 6.0.1 Run SonarQube
+
+SonarQube is configured as an optional Docker profile so normal startup is unchanged.
+
+1. Start SonarQube + Postgres:
+
+```powershell
+docker compose --profile quality up -d sonarqube-db sonarqube
+```
+
+2. Open SonarQube:
+- `http://localhost:9000`
+- Default login: `admin` / `admin` (you will be prompted to change password)
+
+3. Create a token in SonarQube and set it in `.env`:
+
+```powershell
+SONAR_TOKEN=your_generated_token
+```
+
+4. Run analysis scripts:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\run-sonar-api.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\run-sonar-ui.ps1
+```
+
 ## 6.1 Run backend
 
 ```powershell

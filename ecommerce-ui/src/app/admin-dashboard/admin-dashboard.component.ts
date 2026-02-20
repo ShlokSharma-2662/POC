@@ -3,6 +3,7 @@ import { CommonModule, CurrencyPipe, DecimalPipe } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { AdminFooterComponent } from "../admin-footer/admin-footer.component";
+import { environment } from '../../environments/environment';
 
 interface PagedResult<T> { items: T[]; totalCount: number; }
 interface AdminOrderItem { price: number; quantity: number; }
@@ -29,7 +30,7 @@ export class AdminDashboardComponent implements OnInit {
   loadingUsers = false;
   loadingErrors = false;
 
-  private apiBase = 'https://localhost:7273/api';
+  private apiBase = environment.apiUrl;
 
   constructor(private http: HttpClient) {}
 
@@ -109,4 +110,3 @@ export class AdminDashboardComponent implements OnInit {
       });
   }
 }
-

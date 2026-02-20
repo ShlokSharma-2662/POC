@@ -1,19 +1,18 @@
-version: '3.8'
-
 services:
   ecommerce-api:
     build: .
     ports:
-      - "5000:80"
-      - "5001:443"
+      - "5000:8080"
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ConnectionStrings__DefaultConnection=Server=sqlserver;Database=EcommerceDB;User Id=sa;Password=YourStrong@Passw0rd;TrustServerCertificate=true
+      - Jwt__SecretKey=This-Is-A-Development-Only-Secret-Key-Change-Me
       - Redis__ConnectionString=redis:6379
-      - RabbitMQ__HostName=rabbitmq
+      - RabbitMQ__Host=rabbitmq
       - RabbitMQ__Port=5672
-      - RabbitMQ__UserName=guest
+      - RabbitMQ__Username=guest
       - RabbitMQ__Password=guest
+      - RabbitMQ__Enabled=true
     depends_on:
       - sqlserver
       - redis
