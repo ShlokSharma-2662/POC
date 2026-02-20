@@ -1,0 +1,5 @@
+.dotnet-home/
+.runner-temp/
+.sonarqube/
+build-diag.log
+
