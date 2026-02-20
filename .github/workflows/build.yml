@@ -51,9 +51,24 @@ jobs:
           if ([string]::IsNullOrWhiteSpace($env:SONAR_HOST_URL)) {
             throw "Missing SONAR_HOST_URL secret."
           }
+          if ($env:SONAR_HOST_URL -match '^(https?://)?(localhost|127\.0\.0\.1|::1)(:\d+)?/?$') {
+            throw "SONAR_HOST_URL points to localhost. GitHub-hosted runners cannot reach your local machine. Use a publicly reachable SonarQube URL or run this workflow on a self-hosted runner."
+          }
+          try {
+            $versionEndpoint = ($env:SONAR_HOST_URL.TrimEnd('/')) + "/api/server/version"
+            Invoke-WebRequest -Uri $versionEndpoint -UseBasicParsing -TimeoutSec 20 | Out-Null
+          } catch {
+            throw "Cannot reach SonarQube at SONAR_HOST_URL from the runner: $($env:SONAR_HOST_URL)"
+          }
       - name: Build and analyze
         shell: powershell
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
         run: |
-          ${{ runner.temp }}\scanner\dotnet-sonarscanner begin /k:"POC" /d:sonar.token="${{ secrets.SONAR_TOKEN }}" /d:sonar.host.url="${{ secrets.SONAR_HOST_URL }}"
+          ${{ runner.temp }}\scanner\dotnet-sonarscanner begin /k:"POC" /d:sonar.token="$env:SONAR_TOKEN" /d:sonar.host.url="$env:SONAR_HOST_URL"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           dotnet build EcommerceAPI/BulkyBook-POC/Ecommerce.sln
-          ${{ runner.temp }}\scanner\dotnet-sonarscanner end /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ${{ runner.temp }}\scanner\dotnet-sonarscanner end /d:sonar.token="$env:SONAR_TOKEN"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
