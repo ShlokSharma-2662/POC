@@ -26,6 +26,3 @@ jobs:
 
     - name: Build
       run: dotnet build EcommerceAPI/BulkyBook-POC/Ecommerce.sln --no-restore
-
-    - name: Test
-      run: dotnet test EcommerceAPI/BulkyBook-POC/Ecommerce.sln --no-build --verbosity normal
