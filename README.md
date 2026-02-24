@@ -1,91 +1,142 @@
 # E-Commerce POC
 
-Enterprise-style full-stack e-commerce proof of concept with:
-- Backend API in `EcommerceAPI/BulkyBook-POC`
-- Frontend UI in `ecommerce-ui`
+Enterprise-style full-stack e-commerce proof of concept demonstrating authentication, payments, messaging, observability, and resilience patterns.
 
-This repository includes implementation and operations notes for authentication, OAuth, payments, email, caching, messaging, observability, resilience, and rate limiting.
+| Component | Technology |
+|-----------|------------|
+| **Backend** | ASP.NET Core 8 · CQRS (MediatR) · Entity Framework Core · SQL Server |
+| **Frontend** | Angular 19 · Bootstrap 5 · RxJS |
+| **Infra** | Docker Compose · Redis · RabbitMQ · SonarQube |
 
-## 1. Features
+---
 
-- JWT authentication and role-based authorization
-- OAuth flows (Google + Microsoft)
-- Product, category, cart, wishlist, checkout, and order workflows
-- Admin operations for users, orders, and reporting
-- Stripe payment integration
-- SendGrid email integration
-- Redis cache abstraction
-- RabbitMQ/MassTransit messaging integration
-- Structured logging and global exception handling
-- Backend and frontend automated tests
+## Table of Contents
 
-## 2. Repository Layout
+- [Features](#features)
+- [Architecture](#architecture)
+- [Repository Layout](#repository-layout)
+- [Tech Stack](#tech-stack)
+- [Prerequisites](#prerequisites)
+- [Quick Start](#quick-start)
+- [Docker Workflow](#docker-workflow)
+- [Build & Test](#build-and-test)
+- [Configuration](#configuration)
+- [Secrets & Security](#secrets-and-security)
+- [CI/CD](#cicd)
+- [SonarQube Analysis](#sonarqube-analysis)
+- [Troubleshooting](#troubleshooting)
+- [Documentation Index](#documentation-index)
 
-```text
-POC/
-  EcommerceAPI/
-    BulkyBook-POC/
-      Ecommerce.API/              ASP.NET Core Web API host
-      Ecommerce.Application/      CQRS handlers, DTOs, use cases
-      Ecommerce.Domain/           Entities and domain interfaces
-      Ecommerce.Infrastructure/   EF Core, integrations, service wiring
-      Ecommerce.Tests/            xUnit test project
-      scripts/                    Backend utility scripts
-      Guidline/                   Backend implementation and ops docs
-      Ecommerce.sln               Backend solution file
-  ecommerce-ui/                   Angular frontend app
-  scripts/                        Root helper scripts (including Sonar)
-  .github/workflows/              GitHub Actions workflows
-  README.md                       Primary onboarding + runbook
-  ROOT_INDEX.md                   Quick navigation index
+---
+
+## Features
+
+| Area | Capabilities |
+|------|--------------|
+| **Auth** | JWT + role-based authorization, OAuth (Google, Microsoft) |
+| **E-Commerce** | Products, categories, cart, wishlist, checkout, orders |
+| **Admin** | User management, order management, reporting |
+| **Integrations** | Stripe payments, SendGrid email |
+| **Infrastructure** | Redis caching, RabbitMQ/MassTransit messaging |
+| **Observability** | Structured logging (Serilog), Application Insights |
+| **Resilience** | Polly policies, rate limiting (IP + client) |
+| **Quality** | Backend (xUnit) and frontend (Karma/Jasmine) automated tests |
+
+---
+
+## Architecture
+
+```
+┌─────────────────┐     ┌──────────────────────────────────────────────────┐
+│   Angular 19    │     │              ASP.NET Core 8 API                   │
+│   (Port 4200)   │────▶│  CQRS · JWT · OAuth · Rate Limiting · Polly       │
+└─────────────────┘     └──────────────────────────────────────────────────┘
+                                        │
+        ┌───────────────────────────────┼───────────────────────────────┐
+        ▼               ▼               ▼               ▼               ▼
+   ┌─────────┐   ┌──────────┐   ┌───────────┐   ┌──────────┐   ┌────────────┐
+   │SQL      │   │  Redis   │   │ RabbitMQ  │   │ Stripe   │   │ SendGrid   │
+   │Server   │   │  Cache   │   │ Messaging │   │ Payments │   │ Email      │
+   └─────────┘   └──────────┘   └───────────┘   └──────────┘   └────────────┘
 ```
 
-## 3. Tech Stack
+---
+
+## Repository Layout
+
+```
+POC/
+├── EcommerceAPI/
+│   └── BulkyBook-POC/
+│       ├── Ecommerce.API/           # Web API host
+│       ├── Ecommerce.Application/   # CQRS handlers, DTOs, use cases
+│       ├── Ecommerce.Domain/        # Entities and domain interfaces
+│       ├── Ecommerce.Infrastructure/# EF Core, integrations, DI
+│       ├── Ecommerce.Tests/         # xUnit tests
+│       ├── Guidline/                # Backend guides and docs
+│       ├── scripts/                 # Backend utility scripts
+│       └── Ecommerce.sln
+├── ecommerce-ui/                    # Angular frontend
+├── scripts/                         # Root scripts (Sonar, etc.)
+├── .github/workflows/               # GitHub Actions
+├── docker-compose.yml               # Full stack + optional SonarQube
+├── .env.example                     # Environment template
+└── README.md
+```
+
+---
+
+## Tech Stack
 
 ### Backend
-- .NET / ASP.NET Core Web API
+
+- .NET 8 / ASP.NET Core Web API
 - Entity Framework Core (SQL Server)
-- MediatR (CQRS pattern)
+- MediatR (CQRS)
 - Serilog + Application Insights
-- JWT auth + OAuth providers
-- Rate limiting middleware
-- Redis cache services
+- JWT + OAuth (Google, Microsoft)
+- Rate limiting middleware (IP + client)
+- Redis cache abstraction
 - MassTransit + RabbitMQ
-- Stripe and SendGrid integrations
+- Stripe, SendGrid
 - Polly resilience policies
 
 ### Frontend
-- Angular (standalone components)
-- RxJS
-- Bootstrap + SCSS
-- Chart.js/ng2-charts
-- Toastr notifications
+
+- Angular 19 (standalone components)
+- RxJS, Bootstrap 5, SCSS
+- Chart.js / ng2-charts
+- ngx-toastr, Stripe.js
 
 ### Testing
+
 - Backend: xUnit, Moq, FluentAssertions, AutoFixture
-- Frontend: Karma/Jasmine
+- Frontend: Karma, Jasmine
 
-## 4. Prerequisites
+---
 
-- Windows + PowerShell
-- .NET SDK
-- Node.js 20+ and npm
-- SQL Server or LocalDB
-- Docker Desktop (recommended for full local stack)
-- Optional local dependencies:
-  - Redis
-  - RabbitMQ
-  - SonarQube (for local analysis)
+## Prerequisites
 
-## 5. Quick Start (Local)
+| Requirement | Notes |
+|-------------|-------|
+| **Windows + PowerShell** | Primary dev environment |
+| **.NET SDK 8** | `dotnet --version` |
+| **Node.js 20+** | For Angular |
+| **SQL Server / LocalDB** | Local development |
+| **Docker Desktop** | For full stack and optional services |
+| **Optional** | Redis, RabbitMQ (or use Docker) |
 
-From repository root:
+---
+
+## Quick Start
+
+### 1. Clone and navigate
 
 ```powershell
 cd D:\POC_NEW\POC
 ```
 
-### Backend
+### 2. Backend
 
 ```powershell
 dotnet restore EcommerceAPI\BulkyBook-POC\Ecommerce.sln
@@ -93,11 +144,10 @@ dotnet build EcommerceAPI\BulkyBook-POC\Ecommerce.sln
 dotnet run --project EcommerceAPI\BulkyBook-POC\Ecommerce.API
 ```
 
-Default API endpoints (local):
-- `https://localhost:7273`
-- `https://localhost:7273/swagger`
+- API: `https://localhost:7273`
+- Swagger: `https://localhost:7273/swagger`
 
-### Frontend
+### 3. Frontend
 
 ```powershell
 cd ecommerce-ui
@@ -105,212 +155,190 @@ npm install
 npm start
 ```
 
-Default UI endpoint:
-- `http://localhost:4200`
+- UI: `http://localhost:4200`
 
-## 6. Docker Workflow
+---
+
+## Docker Workflow
+
+### First-time setup
+
+```powershell
+Copy-Item .env.example .env
+# Edit .env and set SQL_SA_PASSWORD, JWT_SECRET_KEY
+```
 
 ### Start full stack
 
 ```powershell
-cd D:\POC_NEW\POC
-Copy-Item .env.example .env
 docker compose up --build -d
 ```
 
-Typical endpoints:
-- UI: `http://localhost:4200`
-- API: `http://localhost:7273`
-- Swagger: `http://localhost:7273/swagger`
-- RabbitMQ Management: `http://localhost:15672`
+| Service | URL |
+|---------|-----|
+| UI | http://localhost:4200 |
+| API | http://localhost:7273 |
+| Swagger | http://localhost:7273/swagger |
+| RabbitMQ Management | http://localhost:15672 |
 
-### Stop stack
+### Stop
 
 ```powershell
 docker compose down
 ```
 
-## 7. SonarQube Analysis
+### Environment variables (`.env`)
 
-### Local SonarQube with Docker profile
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `SQL_SA_PASSWORD` | SQL Server SA password | `YourStrong@Passw0rd` |
+| `JWT_SECRET_KEY` | JWT signing key | Change for production |
+| `SONARQUBE_DB_*` | SonarQube (quality profile) | See `.env.example` |
+| `SONAR_HOST_URL` | SonarQube URL | `http://localhost:9000` |
+| `SONAR_TOKEN` | SonarQube auth token | From SonarQube UI |
+
+---
+
+## Build and Test
+
+### Backend
+
+```powershell
+# Build
+dotnet build EcommerceAPI\BulkyBook-POC\Ecommerce.sln
+
+# Run tests
+dotnet test EcommerceAPI\BulkyBook-POC\Ecommerce.sln -c Debug
+
+# Code coverage
+dotnet test EcommerceAPI\BulkyBook-POC\Ecommerce.sln --collect:"XPlat Code Coverage"
+```
+
+### Frontend
+
+```powershell
+cd ecommerce-ui
+
+# Run tests
+npm test
+
+# Production build
+npm run build
+# Output: ecommerce-ui/dist/ecommerce-ui/
+```
+
+---
+
+## Configuration
+
+### Backend
+
+- `EcommerceAPI/BulkyBook-POC/Ecommerce.API/appsettings.json`
+- `appsettings.Development.json`, `appsettings.Production.json`
+
+Key sections: `ConnectionStrings`, `Jwt`, `OAuth`, `GoogleOAuth`, `Stripe`, `SendGrid`, `Redis`, `RabbitMQ`, `RateLimiting`, `KeyVault`, `Serilog`, `ApplicationInsights`.
+
+### Frontend
+
+- `ecommerce-ui/src/environments/environment.ts`
+- `ecommerce-ui/src/environments/environment.prod.ts`
+
+Key settings: `apiUrl`, OAuth client IDs, Stripe publishable key.
+
+---
+
+## Secrets and Security
+
+**Never commit real secrets to source control.**
+
+| Environment | Approach |
+|-------------|----------|
+| Local dev | .NET User Secrets |
+| Runtime / CI | Environment variables |
+| Production | Azure Key Vault or equivalent |
+
+Reference docs:
+
+- `WHERE_TO_STORE_SECRETS.md` (if present)
+- `EcommerceAPI/BulkyBook-POC/Guidline/SECRETS_MANAGEMENT_GUIDE.md`
+- `EcommerceAPI/BulkyBook-POC/Guidline/SECRETS_MIGRATION_CHECKLIST.md`
+
+---
+
+## CI/CD
+
+### Workflow
+
+- **File:** `.github/workflows/dotnet.yml`
+- **Triggers:** Push and pull requests to `Dev`
+- **Actions:** Restore, build (.NET 8)
+
+```yaml
+on:
+  push:
+    branches: [ "Dev" ]
+  pull_request:
+    branches: [ "Dev" ]
+```
+
+### Future enhancements
+
+For SonarQube in CI: configure `SONAR_TOKEN` and `SONAR_HOST_URL` (must be reachable from GitHub runners; use a cloud SonarQube or self-hosted runner).
+
+---
+
+## SonarQube Analysis
+
+### Start SonarQube (Docker)
 
 ```powershell
 docker compose --profile quality up -d sonarqube-db sonarqube
 ```
 
-Local SonarQube URL:
-- `http://localhost:9000`
+- SonarQube: http://localhost:9000
 
-### Run local analysis scripts
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\run-sonar-api.ps1
-powershell -ExecutionPolicy Bypass -File .\scripts\run-sonar-ui.ps1
-```
-
-## 8. CI Pipeline (GitHub Actions)
-
-Workflow file:
-- `.github/workflows/build.yml`
-
-Trigger:
-- Push to branch `Dev`
-
-What the pipeline does:
-- Checks out repository with full history
-- Sets up JDK 17
-- Caches Sonar scanner artifacts
-- Validates required Sonar secrets
-- Builds backend solution
-- Runs Sonar scanner `begin` and `end`
-
-Required GitHub secrets:
-- `SONAR_TOKEN`
-- `SONAR_HOST_URL`
-
-Important:
-- `SONAR_HOST_URL` must be reachable from GitHub-hosted runners.
-- Do not use `localhost` for `SONAR_HOST_URL` in GitHub Actions.
-- If SonarQube is only available on local/private network, run CI on a self-hosted runner.
-
-## 9. Build and Test Commands
-
-### Backend build
+### Run local analysis
 
 ```powershell
-dotnet build EcommerceAPI\BulkyBook-POC\Ecommerce.sln
+# From repo root; requires .env with SONAR_TOKEN and SONAR_HOST_URL
+.\scripts\run-sonar-api.ps1
+.\scripts\run-sonar-ui.ps1
 ```
 
-### Backend tests
+---
 
-```powershell
-dotnet test EcommerceAPI\BulkyBook-POC\Ecommerce.sln -c Debug
-```
+## Troubleshooting
 
-### Backend coverage
+| Issue | Cause | Fix |
+|-------|-------|-----|
+| `MSB1003` on `dotnet build` | Wrong directory | Use full path: `dotnet build EcommerceAPI\BulkyBook-POC\Ecommerce.sln` |
+| Invalid Sonar token/URL | Missing env vars | Set `SONAR_TOKEN`, `SONAR_HOST_URL` in `.env` or environment |
+| Sonar `localhost:9000` refused (CI) | GitHub runner can't reach local SonarQube | Use cloud SonarQube or self-hosted runner |
+| Frontend 401/403/429 or CORS | API unreachable, auth, or rate limits | Check `apiUrl`, JWT interceptor, CORS, rate-limit headers |
 
-```powershell
-dotnet test EcommerceAPI\BulkyBook-POC\Ecommerce.sln --collect:"XPlat Code Coverage"
-```
+---
 
-### Frontend tests
+## Documentation Index
 
-```powershell
-cd ecommerce-ui
-npm test
-```
+### Root-level docs
 
-### Frontend production build
-
-```powershell
-cd ecommerce-ui
-npm run build
-```
-
-Build output:
-- `ecommerce-ui/dist/ecommerce-ui`
-
-## 10. Configuration Guide
-
-### Backend configuration files
-- `EcommerceAPI/BulkyBook-POC/Ecommerce.API/appsettings.json`
-- `EcommerceAPI/BulkyBook-POC/Ecommerce.API/appsettings.Development.json`
-- `EcommerceAPI/BulkyBook-POC/Ecommerce.API/appsettings.Production.json`
-
-Common backend configuration sections:
-- `ConnectionStrings`
-- `Jwt`
-- `OAuth` / `GoogleOAuth`
-- `Stripe`
-- `SendGrid`
-- `Redis`
-- `RabbitMQ`
-- `RateLimiting`
-- `KeyVault`
-- `Serilog`
-
-### Frontend configuration files
-- `ecommerce-ui/src/environments/environment.ts`
-- `ecommerce-ui/src/environments/environment.prod.ts`
-
-Common frontend settings:
-- `apiUrl`
-- OAuth client settings
-- Stripe publishable key
-- rate-limiting related values
-
-## 11. Secrets and Security
-
-Never commit real secrets to source control.
-
-Use:
-- .NET User Secrets for local development
-- Environment variables for runtime/pipelines
-- Azure Key Vault (or equivalent secret manager) for production
-
-Reference docs:
-- `WHERE_TO_STORE_SECRETS.md`
-- `EcommerceAPI/BulkyBook-POC/Guidline/SECRETS_MANAGEMENT_GUIDE.md`
-- `EcommerceAPI/BulkyBook-POC/Guidline/SECRETS_MIGRATION_CHECKLIST.md`
-
-## 12. Troubleshooting
-
-### `dotnet build` fails with MSB1003
-Cause:
-- You are running build from a folder without a `.sln`/`.csproj`.
-
-Fix:
-```powershell
-dotnet build EcommerceAPI\BulkyBook-POC\Ecommerce.sln
-```
-
-### Sonar scanner reports invalid `sonar.token` / `sonar.host.url`
-Cause:
-- Empty/missing GitHub secrets.
-
-Fix:
-- Set `SONAR_TOKEN` and `SONAR_HOST_URL` in repository secrets.
-
-### Sonar scanner cannot connect (`localhost:9000` refused)
-Cause:
-- GitHub-hosted runner cannot access your local SonarQube.
-
-Fix:
-- Use publicly reachable SonarQube URL, or
-- Use a self-hosted GitHub runner on the same network as SonarQube.
-
-### Frontend receives 401/403/429 or CORS issues
-Checklist:
-- Backend is running and reachable at configured `apiUrl`
-- JWT is being sent by interceptor
-- CORS policy allows frontend origin
-- Rate-limit windows/headers are understood by client
-
-## 13. Additional Project Documentation
-
-Root-level docs:
 - `E-Commerce_Project_Presentation.md`
-- `API_RESPONSE_REFACTORING_SUMMARY.md`
-- `UI_RESPONSE_REFACTORING_SUMMARY.md`
-- `GOOGLE_OAUTH_IMPLEMENTATION.md`
-- `GUEST_USER_IMPLEMENTATION.md`
-- `REDIS_COMPREHENSIVE_IMPLEMENTATION.md`
-- `REDIS_IMPLEMENTATION_SUMMARY.md`
-- `EMAIL_IMPLEMENTATION_SUMMARY.md`
-- `EMAIL_DIAGNOSTIC_REPORT.md`
-- `SENDGRID_SETUP.md`
+- `API_RESPONSE_REFACTORING_SUMMARY.md`, `UI_RESPONSE_REFACTORING_SUMMARY.md`
+- `GOOGLE_OAUTH_IMPLEMENTATION.md`, `GUEST_USER_IMPLEMENTATION.md`
+- `REDIS_COMPREHENSIVE_IMPLEMENTATION.md`, `REDIS_IMPLEMENTATION_SUMMARY.md`
+- `EMAIL_IMPLEMENTATION_SUMMARY.md`, `EMAIL_DIAGNOSTIC_REPORT.md`, `SENDGRID_SETUP.md`
 
-Backend guideline docs:
+### Backend guidelines
+
 - `EcommerceAPI/BulkyBook-POC/Guidline/README.md`
-- `EcommerceAPI/BulkyBook-POC/Guidline/HOW_TO_RUN_TESTS.md`
-- `EcommerceAPI/BulkyBook-POC/Guidline/RATE_LIMITING_TEST_GUIDE.md`
-- `EcommerceAPI/BulkyBook-POC/Guidline/RABBITMQ_IMPLEMENTATION_GUIDE.md`
-- `EcommerceAPI/BulkyBook-POC/Guidline/RESILIENCE_TESTING_GUIDE.md`
+- `HOW_TO_RUN_TESTS.md`, `RATE_LIMITING_TEST_GUIDE.md`
+- `RABBITMQ_IMPLEMENTATION_GUIDE.md`, `RESILIENCE_TESTING_GUIDE.md`
 
-## 14. Recommended Dev Flow
+---
 
-1. Restore/build backend solution.
-2. Run backend API and verify Swagger loads.
-3. Start frontend and verify login + product listing.
-4. Run backend and frontend tests before pushing.
-5. Externalize all secrets before any deployment/CI run.
+## Recommended Dev Flow
+
+1. Restore and build the backend; verify Swagger at `https://localhost:7273/swagger`.
+2. Start the frontend; verify login and product listing.
+3. Run backend and frontend tests before pushing.
+4. Keep all secrets out of source; use User Secrets or env vars.
