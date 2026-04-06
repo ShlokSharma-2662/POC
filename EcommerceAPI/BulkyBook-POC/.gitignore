@@ -361,3 +361,12 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# JetBrains IDEs
+.idea/
+
+# SonarQube
+.sonarqube/
+
+# Coverage reports
+CoverageReport/

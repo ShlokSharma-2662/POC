@@ -1,13 +1,11 @@
-﻿using Ecommerce.Application.Features.Orders.Models;
-using Ecommerce.Application.Features.Orders.Queries;
 using Ecommerce.Application.Common.Services;
-using Ecommerce.Domain.Entities;
-using Ecommerce.Infrastructure.Persistence;
+using Ecommerce.Application.Features.Orders.Models;
+using Ecommerce.Application.Features.Orders.Queries;
 using Ecommerce.Infrastructure.Caching;
+using Ecommerce.Infrastructure.Persistence;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
-using OrderItemDto = Ecommerce.Application.Features.Orders.Models.OrderItemDto;
 
 namespace Ecommerce.Application.Features.Orders.Handlers
 {
@@ -33,14 +31,11 @@ namespace Ecommerce.Application.Features.Orders.Handlers
             var userId = _userContextService.GetCurrentUserId();
             if (!userId.HasValue)
             {
-                // optionally: throw new UnauthorizedAccessException();
-                return new(); // or return empty list
+                return new List<OrderDto>();
             }
 
-            // Generate cache key for user-specific orders
             var cacheKey = CacheKeyBuilder.UserOrders(userId.Value);
 
-            // Try to get data from cache first
             if (_isCacheEnabled == "true")
             {
                 var cachedData = await _cacheService.GetAsync<List<OrderDto>>(cacheKey);
@@ -50,30 +45,13 @@ namespace Ecommerce.Application.Features.Orders.Handlers
                 }
             }
 
-            // If not in cache, fetch from database
             var orders = await _context.Orders
                 .AsNoTracking()
-                .Where(o => o.UserId == userId.Value)
-                .Select(o => new OrderDto
-                {
-                    Id = o.Id,
-                    CustomerName = o.CustomerName,
-                    ShippingAddress = o.ShippingAddress,
-                    Phone = o.Phone,
-                    CreatedAt = o.CreatedAt,
-                    Status = string.IsNullOrEmpty(o.Status) ? "Pending" : o.Status,
-                    Items = o.Items.Select(i => new OrderItemDto
-                    {
-                        ProductId = i.ProductId,
-                        ProductName = i.Product != null ? i.Product.Name : "Product not found",
-                        Price = i.Product != null ? i.Product.Price : 0,
-                        Quantity = i.Quantity,
-                        ImageUrl = i.Product != null ? i.Product.ImageUrl : ""
-                    }).ToList()
-                })
+                .Where(order => order.UserId == userId.Value)
+                .OrderByDescending(order => order.CreatedAt)
+                .Select(OrderMappings.ToOrderDtoExpression)
                 .ToListAsync(ct);
 
-            // Cache the result for future requests
             if (_isCacheEnabled == "true")
             {
                 await _cacheService.SetAsync(cacheKey, orders);
@@ -82,5 +60,4 @@ namespace Ecommerce.Application.Features.Orders.Handlers
             return orders;
         }
     }
-
 }

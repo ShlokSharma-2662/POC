@@ -1,0 +1,18 @@
+using FluentValidation;
+using Ecommerce.Application.Features.Auth.Command;
+
+namespace Ecommerce.Application.Features.Auth.Commands.Validators
+{
+    public class LoginUserCommandValidator : AbstractValidator<LoginUserCommand>
+    {
+        public LoginUserCommandValidator()
+        {
+            RuleFor(x => x.Email)
+                .NotEmpty().WithMessage("Email is required")
+                .EmailAddress().WithMessage("Invalid email format");
+
+            RuleFor(x => x.Password)
+                .NotEmpty().WithMessage("Password is required");
+        }
+    }
+}

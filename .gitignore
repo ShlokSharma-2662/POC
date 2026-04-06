@@ -1,5 +1,27 @@
+# Runtime / CI tooling
 .dotnet-home/
 .runner-temp/
 .sonarqube/
-build-diag.log
 
+# Build logs
+build-diag.log
+build_errors*.txt
+*.log
+
+# Archives
+archive/
+
+# OS files
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# IDE
+.idea/
+.vs/
+*.swp
+*.swo
+
+# Coverage
+CoverageReport/
+TestResults/

@@ -1,11 +1,14 @@
-﻿using Ecommerce.Application.Common.Models;
+using Ecommerce.Application.Common.Models;
+using Ecommerce.API.GraphQL;
 using Ecommerce.Application.Features.Admin.Commands;
 using Ecommerce.Application.Features.Admin.Models;
 using Ecommerce.Application.Features.Admin.Queries;
+using Ecommerce.Infrastructure.Services;
 using Ecommerce.Application.Features.Metrics.Commands;
 using Ecommerce.Application.Features.Metrics.Queries;
 using Ecommerce.Domain.Entities;
 using Ecommerce.Infrastructure.Persistence;
+using HotChocolate.Subscriptions;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -19,10 +22,12 @@ namespace Ecommerce.API.Controllers
     public class AdminController : BaseController
     {
         private readonly IMediator _mediator;
+        private readonly IEventGridPublisherService _eventGridPublisher;
 
-        public AdminController(IMediator mediator)
+        public AdminController(IMediator mediator, IEventGridPublisherService eventGridPublisher)
         {
             _mediator = mediator;
+            _eventGridPublisher = eventGridPublisher;
         }
 
         [HttpGet("all-orders")]
@@ -40,7 +45,7 @@ namespace Ecommerce.API.Controllers
         }
 
         [HttpPut("orders/{id}/status")]
-        public async Task<ActionResult<object>> UpdateStatus(Guid id, [FromBody] UpdateStatusDto dto)
+        public async Task<ActionResult<object>> UpdateStatus(Guid id, [FromBody] UpdateStatusDto dto, [FromServices] ITopicEventSender topicEventSender)
         {
             try
             {
@@ -56,6 +61,21 @@ namespace Ecommerce.API.Controllers
 
                 var result = await _mediator.Send(command);
                 if (!result) return NotFoundResponse("Order not found");
+
+                if (Ecommerce.Application.Features.Orders.Models.OrderStatuses.TryNormalize(dto.Status, out var normalizedStatus))
+                {
+                    await topicEventSender.SendAsync(
+                        GraphQlEventTopics.OrderStatusChanged,
+                        new OrderStatusSubscriptionPayload
+                        {
+                            OrderId = id,
+                            CurrentStatus = normalizedStatus,
+                            ChangedAt = DateTime.UtcNow
+                        });
+ 
+                    // Publish to Event Grid for downstream consumption
+                    await _eventGridPublisher.PublishOrderEventAsync(id, "Admin", normalizedStatus);
+                }
 
                 return SuccessResponse(new { success = true }, "Success", "Order status updated successfully");
             }

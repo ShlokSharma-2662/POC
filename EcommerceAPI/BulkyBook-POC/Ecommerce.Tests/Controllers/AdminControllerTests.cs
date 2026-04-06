@@ -7,6 +7,7 @@ using Ecommerce.Application.Features.Metrics.Commands;
 using Ecommerce.Application.Features.Metrics.Queries;
 using Ecommerce.Domain.Entities;
 using Ecommerce.Infrastructure.Persistence;
+using Ecommerce.Infrastructure.Services;
 using Ecommerce.Tests.Common;
 using FluentAssertions;
 using MediatR;
@@ -15,6 +16,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
+using HotChocolate.Subscriptions;
 
 namespace Ecommerce.Tests.Controllers
 {
@@ -23,6 +25,8 @@ namespace Ecommerce.Tests.Controllers
         private readonly Mock<IMediator> _mockMediator;
         private readonly Mock<IServiceProvider> _mockServiceProvider;
         private readonly Mock<IServiceScope> _mockServiceScope;
+        private readonly Mock<ITopicEventSender> _mockTopicEventSender;
+        private readonly Mock<IEventGridPublisherService> _mockEventGridPublisher;
         private readonly AdminController _controller;
 
         public AdminControllerTests()
@@ -30,7 +34,9 @@ namespace Ecommerce.Tests.Controllers
             _mockMediator = new Mock<IMediator>();
             _mockServiceProvider = new Mock<IServiceProvider>();
             _mockServiceScope = new Mock<IServiceScope>();
-            _controller = new AdminController(_mockMediator.Object);
+            _mockTopicEventSender = new Mock<ITopicEventSender>();
+            _mockEventGridPublisher = new Mock<IEventGridPublisherService>();
+            _controller = new AdminController(_mockMediator.Object, _mockEventGridPublisher.Object);
             SetupHttpContext();
         }
 
@@ -131,7 +137,7 @@ namespace Ecommerce.Tests.Controllers
                         .ReturnsAsync(true);
 
             // Act
-            var result = await _controller.UpdateStatus(orderId, dto);
+            var result = await _controller.UpdateStatus(orderId, dto, _mockTopicEventSender.Object);
 
             // Assert
             AssertSuccessResponse(result);
@@ -147,7 +153,7 @@ namespace Ecommerce.Tests.Controllers
             var orderId = Guid.NewGuid();
 
             // Act
-            var result = await _controller.UpdateStatus(orderId, null);
+            var result = await _controller.UpdateStatus(orderId, null, _mockTopicEventSender.Object);
 
             // Assert
             result.Should().BeOfType<ActionResult<object>>();
@@ -170,7 +176,7 @@ namespace Ecommerce.Tests.Controllers
             };
 
             // Act
-            var result = await _controller.UpdateStatus(orderId, dto);
+            var result = await _controller.UpdateStatus(orderId, dto, _mockTopicEventSender.Object);
 
             // Assert
             result.Should().BeOfType<ActionResult<object>>();
@@ -196,7 +202,7 @@ namespace Ecommerce.Tests.Controllers
                         .ReturnsAsync(false);
 
             // Act
-            var result = await _controller.UpdateStatus(orderId, dto);
+            var result = await _controller.UpdateStatus(orderId, dto, _mockTopicEventSender.Object);
 
             // Assert
             result.Should().BeOfType<ActionResult<object>>();

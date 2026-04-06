@@ -18,5 +18,6 @@ namespace Ecommerce.Application.Features.Products.Queries
         public decimal? MinPrice { get; set; }
         public decimal? MaxPrice { get; set; }
         public string? CategoryName { get; set; }
+        public bool? InStockOnly { get; set; }
     }
 }

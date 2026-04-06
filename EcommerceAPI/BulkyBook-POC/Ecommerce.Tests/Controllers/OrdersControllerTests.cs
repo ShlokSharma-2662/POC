@@ -1,4 +1,4 @@
-using Ecommerce.API.Controllers;
+using Ecommerce.OrderService.Controllers;
 using Ecommerce.Application.Features.Orders.Commands;
 using Ecommerce.Application.Features.Orders.Models;
 using Ecommerce.Application.Features.Orders.Queries;
@@ -9,6 +9,13 @@ using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Moq;
+using Moq.Protected;
+using Ecommerce.Infrastructure.Services;
+using Ecommerce.Application.Common.Services;
+using Microsoft.Extensions.Configuration;
+using System.Net;
+using System.Net.Http;
+using System.Threading;
 using OrderItemDto = Ecommerce.Application.Features.Orders.Commands.OrderItemDto;
 
 namespace Ecommerce.Tests.Controllers
@@ -16,14 +23,32 @@ namespace Ecommerce.Tests.Controllers
     public class OrdersControllerTests : ControllerTestBase
     {
         private readonly Mock<IMediator> _mockMediator;
+        private readonly Mock<IEventGridPublisherService> _mockEventGridPublisher;
+        private readonly Mock<IUserContextService> _mockUserContext;
+        private readonly Mock<IHttpClientFactory> _mockHttpClientFactory;
+        private readonly Mock<IConfiguration> _mockConfiguration;
         private readonly OrdersController _controller;
 
         public OrdersControllerTests()
         {
             _mockMediator = new Mock<IMediator>();
+            _mockEventGridPublisher = new Mock<IEventGridPublisherService>();
+            _mockUserContext = new Mock<IUserContextService>();
+            _mockHttpClientFactory = new Mock<IHttpClientFactory>();
+            _mockConfiguration = new Mock<IConfiguration>();
+
             var messagePublisherMock = new Mock<IMessagePublisherService>();
             var loggerMock = new Mock<ILogger<OrdersController>>();
-            _controller = new OrdersController(_mockMediator.Object, messagePublisherMock.Object, loggerMock.Object);
+
+            _controller = new OrdersController(
+                _mockMediator.Object,
+                messagePublisherMock.Object,
+                _mockEventGridPublisher.Object,
+                _mockHttpClientFactory.Object,
+                _mockUserContext.Object,
+                _mockConfiguration.Object,
+                loggerMock.Object);
+
             SetupHttpContext();
         }
 
@@ -33,6 +58,23 @@ namespace Ecommerce.Tests.Controllers
             // Arrange
             SetupAuthenticatedUser(1);
             SetupControllerContext(_controller);
+ 
+            _mockUserContext.Setup(x => x.GetCurrentUserId()).Returns(1L);
+ 
+            var mockHttpMessageHandler = new Mock<HttpMessageHandler>();
+            mockHttpMessageHandler.Protected()
+                .Setup<Task<HttpResponseMessage>>(
+                    "SendAsync",
+                    Moq.Protected.ItExpr.IsAny<HttpRequestMessage>(),
+                    Moq.Protected.ItExpr.IsAny<CancellationToken>())
+                .ReturnsAsync(new HttpResponseMessage
+                {
+                    StatusCode = HttpStatusCode.OK,
+                    Content = new StringContent("{}")
+                });
+ 
+            var httpClient = new HttpClient(mockHttpMessageHandler.Object);
+            _mockHttpClientFactory.Setup(x => x.CreateClient(It.IsAny<string>())).Returns(httpClient);
 
             var command = new CheckoutOrderCommand
             {

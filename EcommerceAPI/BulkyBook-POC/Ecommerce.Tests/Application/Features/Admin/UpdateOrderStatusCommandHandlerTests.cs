@@ -1,8 +1,10 @@
 using Ecommerce.Application.Features.Admin.Commands;
 using Ecommerce.Application.Features.Admin.Handlers;
 using Ecommerce.Domain.Entities;
+using Ecommerce.Domain.Interfaces;
 using Ecommerce.Infrastructure.Caching;
 using Ecommerce.Infrastructure.Persistence;
+using Ecommerce.Infrastructure.Services;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Moq;
@@ -13,6 +15,7 @@ namespace Ecommerce.Tests.Application.Features.Admin
     {
         private readonly AppDbContext _context;
         private readonly Mock<ICacheInvalidationService> _mockCacheInvalidationService;
+        private readonly Mock<IMessagePublisherService> _mockMessagePublisherService;
         private readonly UpdateOrderStatusCommandHandler _handler;
 
         public UpdateOrderStatusCommandHandlerTests()
@@ -23,7 +26,8 @@ namespace Ecommerce.Tests.Application.Features.Admin
 
             _context = new AppDbContext(options);
             _mockCacheInvalidationService = new Mock<ICacheInvalidationService>();
-            _handler = new UpdateOrderStatusCommandHandler(_context, _mockCacheInvalidationService.Object);
+            _mockMessagePublisherService = new Mock<IMessagePublisherService>();
+            _handler = new UpdateOrderStatusCommandHandler(_context, _mockCacheInvalidationService.Object, _mockMessagePublisherService.Object);
         }
 
         [Fact]
@@ -48,7 +52,7 @@ namespace Ecommerce.Tests.Application.Features.Admin
             var command = new UpdateOrderStatusCommand 
             { 
                 OrderId = orderId, 
-                Status = "Completed" 
+                Status = "Confirmed" 
             };
 
             // Act
@@ -59,7 +63,7 @@ namespace Ecommerce.Tests.Application.Features.Admin
             
             var updatedOrder = await _context.Orders.FindAsync(orderId);
             updatedOrder.Should().NotBeNull();
-            updatedOrder!.Status.Should().Be("Completed");
+            updatedOrder!.Status.Should().Be("Confirmed");
             
             _mockCacheInvalidationService.Verify(
                 x => x.InvalidateOrderCacheAsync(orderId),
@@ -74,7 +78,7 @@ namespace Ecommerce.Tests.Application.Features.Admin
             var command = new UpdateOrderStatusCommand 
             { 
                 OrderId = nonExistentOrderId, 
-                Status = "Completed" 
+                Status = "Confirmed" 
             };
 
             // Act
@@ -121,7 +125,7 @@ namespace Ecommerce.Tests.Application.Features.Admin
             var command2 = new UpdateOrderStatusCommand 
             { 
                 OrderId = orderId, 
-                Status = "Completed" 
+                Status = "Confirmed" 
             };
 
             // Act
@@ -132,7 +136,7 @@ namespace Ecommerce.Tests.Application.Features.Admin
             
             var updatedOrder = await _context.Orders.FindAsync(orderId);
             updatedOrder.Should().NotBeNull();
-            updatedOrder!.Status.Should().Be("Completed");
+            updatedOrder!.Status.Should().Be("Confirmed");
         }
 
         [Fact]
@@ -154,7 +158,7 @@ namespace Ecommerce.Tests.Application.Features.Admin
             _context.Orders.Add(order);
             await _context.SaveChangesAsync();
 
-            var statuses = new[] { "Processing", "Shipped", "Delivered", "Cancelled" };
+            var statuses = new[] { "Confirmed", "Shipped", "Delivered", "Cancelled" };
 
             foreach (var status in statuses)
             {
@@ -211,7 +215,7 @@ namespace Ecommerce.Tests.Application.Features.Admin
             var command = new UpdateOrderStatusCommand 
             { 
                 OrderId = targetOrderId, 
-                Status = "Completed" 
+                Status = "Confirmed" 
             };
 
             // Act
@@ -224,7 +228,7 @@ namespace Ecommerce.Tests.Application.Features.Admin
             var unchangedOtherOrder = await _context.Orders.FindAsync(otherOrderId);
             
             updatedTargetOrder.Should().NotBeNull();
-            updatedTargetOrder!.Status.Should().Be("Completed");
+            updatedTargetOrder!.Status.Should().Be("Confirmed");
             
             unchangedOtherOrder.Should().NotBeNull();
             unchangedOtherOrder!.Status.Should().Be("Pending");
@@ -237,7 +241,7 @@ namespace Ecommerce.Tests.Application.Features.Admin
             var command = new UpdateOrderStatusCommand 
             { 
                 OrderId = Guid.Empty, 
-                Status = "Completed" 
+                Status = "Confirmed" 
             };
 
             // Act
@@ -272,7 +276,7 @@ namespace Ecommerce.Tests.Application.Features.Admin
             var command = new UpdateOrderStatusCommand 
             { 
                 OrderId = orderId, 
-                Status = "Completed" 
+                Status = "Confirmed" 
             };
 
             // Act & Assert
@@ -311,7 +315,7 @@ namespace Ecommerce.Tests.Application.Features.Admin
             var command = new UpdateOrderStatusCommand 
             { 
                 OrderId = orderId, 
-                Status = "Completed" 
+                Status = "Confirmed" 
             };
 
             // Act & Assert
@@ -348,7 +352,7 @@ namespace Ecommerce.Tests.Application.Features.Admin
             var command = new UpdateOrderStatusCommand 
             { 
                 OrderId = orderId, 
-                Status = "Completed" 
+                Status = "Confirmed" 
             };
 
             // Act
@@ -359,7 +363,7 @@ namespace Ecommerce.Tests.Application.Features.Admin
             
             var updatedOrder = await _context.Orders.FindAsync(orderId);
             updatedOrder.Should().NotBeNull();
-            updatedOrder!.Status.Should().Be("Completed");
+            updatedOrder!.Status.Should().Be("Confirmed");
             updatedOrder.CustomerName.Should().Be(originalCustomerName);
             updatedOrder.Phone.Should().Be(originalPhone);
             updatedOrder.ShippingAddress.Should().Be(originalAddress);

@@ -30,6 +30,7 @@
     <PackageReference Include="Polly" />
     <PackageReference Include="Polly.Extensions.Http" />
     <PackageReference Include="Microsoft.Extensions.Http.Polly" />
+    <PackageReference Include="Microsoft.Azure.Cosmos" />
   </ItemGroup>
 
 

@@ -114,6 +114,7 @@ namespace Ecommerce.Infrastructure.Caching
             {
                 // Invalidate all order-related cache entries
                 await _cacheService.RemoveByPatternAsync("orders_*");
+                await _cacheService.RemoveByPatternAsync("user_*_orders");
                 
                 // If specific order ID is provided, also invalidate that specific order
                 if (orderId.HasValue)
@@ -137,6 +138,7 @@ namespace Ecommerce.Infrastructure.Caching
             {
                 // Invalidate all order-related cache entries
                 await _cacheService.RemoveByPatternAsync("orders_*");
+                await _cacheService.RemoveByPatternAsync("user_*_orders");
             }
             catch (Exception)
             {
