@@ -1,0 +1,7 @@
+{
+  "/images": {
+    "target": "https://localhost:7273",
+    "secure": false,
+    "changeOrigin": true
+  }
+}
