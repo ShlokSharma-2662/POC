@@ -1,12 +1,14 @@
-# E-Commerce POC
+# E-Commerce POC — Scalable Enterprise Management System
 
-Enterprise-style full-stack e-commerce proof of concept demonstrating authentication, payments, messaging, observability, and resilience patterns.
+Enterprise-grade full-stack e-commerce system built as a **modular, cloud-native, event-driven, API-first** application. Demonstrates microservices architecture, CQRS, real-time GraphQL subscriptions, gRPC inter-service communication, Azure Functions for task automation, and comprehensive observability.
 
 | Component | Technology |
 |-----------|------------|
-| **Backend** | ASP.NET Core 8 · CQRS (MediatR) · Entity Framework Core · SQL Server |
+| **Backend** | ASP.NET Core 9 · CQRS (MediatR) · Entity Framework Core · SQL Server |
+| **Microservices** | Ecommerce.API · OrderService · ProductService · Azure Functions |
+| **API Layers** | REST · GraphQL (Hot Chocolate) · gRPC · OData |
 | **Frontend** | Angular 19 · Bootstrap 5 · RxJS |
-| **Infra** | Docker Compose · Redis · RabbitMQ · SonarQube |
+| **Infra** | Docker Compose · Redis · RabbitMQ · Azure Event Grid · SonarQube |
 
 ---
 
@@ -35,10 +37,15 @@ Enterprise-style full-stack e-commerce proof of concept demonstrating authentica
 |------|--------------|
 | **Auth** | JWT + role-based authorization, OAuth (Google, Microsoft) |
 | **E-Commerce** | Products, categories, cart, wishlist, checkout, orders |
-| **Admin** | User management, order management, reporting |
+| **Admin** | User management, order management, revenue reporting, performance dashboard |
+| **Microservices** | Dedicated OrderService, ProductService, and Azure Functions project |
+| **API Stack** | REST, GraphQL (queries, mutations, subscriptions), gRPC, OData |
+| **Event-Driven** | Azure Event Grid, RabbitMQ/MassTransit, GraphQL subscriptions (WebSocket) |
+| **Cloud Automation** | Azure Durable Functions (order fulfillment orchestrator), EventGrid triggers, dead letter processing |
 | **Integrations** | Stripe payments, SendGrid email |
-| **Infrastructure** | Redis caching, RabbitMQ/MassTransit messaging |
-| **Observability** | Structured logging (Serilog), Application Insights |
+| **Caching** | Redis distributed cache with invalidation, compiled EF Core queries |
+| **Observability** | Serilog, Application Insights, OpenTelemetry tracing |
+| **Validation** | FluentValidation pipeline behaviors (validation, logging, performance) |
 | **Resilience** | Polly policies, rate limiting (IP + client) |
 | **Quality** | Backend (xUnit) and frontend (Karma/Jasmine) automated tests |
 
@@ -47,17 +54,37 @@ Enterprise-style full-stack e-commerce proof of concept demonstrating authentica
 ## Architecture
 
 ```
-┌─────────────────┐     ┌──────────────────────────────────────────────────┐
-│   Angular 19    │     │              ASP.NET Core 8 API                   │
-│   (Port 4200)   │────▶│  CQRS · JWT · OAuth · Rate Limiting · Polly       │
-└─────────────────┘     └──────────────────────────────────────────────────┘
-                                        │
-        ┌───────────────────────────────┼───────────────────────────────┐
-        ▼               ▼               ▼               ▼               ▼
-   ┌─────────┐   ┌──────────┐   ┌───────────┐   ┌──────────┐   ┌────────────┐
-   │SQL      │   │  Redis   │   │ RabbitMQ  │   │ Stripe   │   │ SendGrid   │
-   │Server   │   │  Cache   │   │ Messaging │   │ Payments │   │ Email      │
-   └─────────┘   └──────────┘   └───────────┘   └──────────┘   └────────────┘
+┌─────────────────┐
+│   Angular 19    │
+│   (Port 4200)   │
+└────────┬────────┘
+         │ HTTP / WebSocket
+         ▼
+┌──────────────────────────────────────────────────────────┐
+│                    Ecommerce.API                         │
+│  REST + GraphQL + gRPC + OData                           │
+│  JWT Auth │ Rate Limiting │ Serilog │ OpenTelemetry       │
+└────────┬──────────────┬──────────────┬───────────────────┘
+         │              │              │
+    ┌────▼────┐   ┌─────▼─────┐  ┌────▼──────────┐
+    │ Order   │   │ Product   │  │ Azure         │
+    │ Service │   │ Service   │  │ Functions     │
+    │ GraphQL │   │ GraphQL   │  │ Durable       │
+    │ CQRS    │   │ OData     │  │ EventGrid     │
+    └────┬────┘   └─────┬─────┘  └────┬──────────┘
+         │              │              │
+    ┌────▼──────────────▼──────────────▼───────────┐
+    │           Shared Infrastructure              │
+    │  EF Core │ Redis │ MassTransit │ Event Grid   │
+    │  Serilog │ App Insights │ FluentValidation    │
+    └────────────────────┬─────────────────────────┘
+                         │
+     ┌───────────┬───────┼────────┬─────────────┐
+     ▼           ▼       ▼        ▼             ▼
+┌─────────┐ ┌────────┐ ┌───────┐ ┌──────────┐ ┌────────┐
+│SQL      │ │ Redis  │ │Rabbit │ │ Stripe   │ │SendGrid│
+│Server   │ │ Cache  │ │MQ     │ │ Payments │ │ Email  │
+└─────────┘ └────────┘ └───────┘ └──────────┘ └────────┘
 ```
 
 ---
@@ -68,19 +95,25 @@ Enterprise-style full-stack e-commerce proof of concept demonstrating authentica
 POC/
 ├── EcommerceAPI/
 │   └── BulkyBook-POC/
-│       ├── Ecommerce.API/           # Web API host
-│       ├── Ecommerce.Application/   # CQRS handlers, DTOs, use cases
-│       ├── Ecommerce.Domain/        # Entities and domain interfaces
-│       ├── Ecommerce.Infrastructure/# EF Core, integrations, DI
-│       ├── Ecommerce.Tests/         # xUnit tests
-│       ├── Guidline/                # Backend guides and docs
-│       ├── scripts/                 # Backend utility scripts
+│       ├── Ecommerce.API/            # Main API host (REST + GraphQL + gRPC + OData)
+│       ├── Ecommerce.OrderService/   # Order microservice (GraphQL subscriptions)
+│       ├── Ecommerce.ProductService/ # Product microservice (GraphQL + OData)
+│       ├── Ecommerce.Functions/      # Azure Functions (Durable, EventGrid, timers)
+│       ├── Ecommerce.Application/    # CQRS handlers, validators, DTOs, behaviors
+│       ├── Ecommerce.Domain/         # Entities, domain interfaces, event sourcing
+│       ├── Ecommerce.Infrastructure/ # EF Core, Redis, messaging, DI
+│       ├── Ecommerce.Tests/          # xUnit tests
+│       ├── Guideline/                # Backend guides and docs
+│       ├── scripts/                  # Backend utility scripts
 │       └── Ecommerce.sln
-├── ecommerce-ui/                    # Angular frontend
-├── scripts/                         # Root scripts (Sonar, etc.)
-├── .github/workflows/               # GitHub Actions
-├── docker-compose.yml               # Full stack + optional SonarQube
-├── .env.example                     # Environment template
+├── ecommerce-ui/                     # Angular frontend
+├── assets/                           # Product images
+├── config/                           # Web.config variants
+├── docs/                             # All project documentation
+├── scripts/                          # Root scripts (Sonar, scaffolding)
+├── .github/workflows/                # GitHub Actions
+├── docker-compose.yml                # Full stack + optional SonarQube
+├── .env.example                      # Environment template
 └── README.md
 ```
 
@@ -90,14 +123,21 @@ POC/
 
 ### Backend
 
-- .NET 8 / ASP.NET Core Web API
-- Entity Framework Core (SQL Server)
-- MediatR (CQRS)
+- .NET 9 / ASP.NET Core Web API
+- Entity Framework Core (SQL Server) with compiled queries
+- MediatR (CQRS) with pipeline behaviors
+- FluentValidation (command validators)
+- Hot Chocolate (GraphQL queries, mutations, subscriptions)
+- gRPC (Protobuf service definitions)
+- OData (advanced filtering & pagination)
+- OpenTelemetry (ASP.NET Core, HttpClient, SqlClient tracing)
 - Serilog + Application Insights
 - JWT + OAuth (Google, Microsoft)
 - Rate limiting middleware (IP + client)
-- Redis cache abstraction
+- Redis distributed cache with pattern-based invalidation
 - MassTransit + RabbitMQ
+- Azure Event Grid (cross-service event publishing)
+- Azure Durable Functions (order fulfillment orchestrator)
 - Stripe, SendGrid
 - Polly resilience policies
 
@@ -120,11 +160,11 @@ POC/
 | Requirement | Notes |
 |-------------|-------|
 | **Windows + PowerShell** | Primary dev environment |
-| **.NET SDK 8** | `dotnet --version` |
+| **.NET SDK 9** | `dotnet --version` |
 | **Node.js 20+** | For Angular |
 | **SQL Server / LocalDB** | Local development |
 | **Docker Desktop** | For full stack and optional services |
-| **Optional** | Redis, RabbitMQ (or use Docker) |
+| **Optional** | Redis, RabbitMQ, Azure Functions Core Tools (or use Docker) |
 
 ---
 
@@ -146,6 +186,7 @@ dotnet run --project EcommerceAPI\BulkyBook-POC\Ecommerce.API
 
 - API: `https://localhost:7273`
 - Swagger: `https://localhost:7273/swagger`
+- GraphQL Playground: `https://localhost:7273/graphql`
 
 ### 3. Frontend
 
@@ -179,6 +220,7 @@ docker compose up --build -d
 | UI | http://localhost:4200 |
 | API | http://localhost:7273 |
 | Swagger | http://localhost:7273/swagger |
+| GraphQL | http://localhost:7273/graphql |
 | RabbitMQ Management | http://localhost:15672 |
 
 ### Stop
@@ -236,7 +278,12 @@ npm run build
 - `EcommerceAPI/BulkyBook-POC/Ecommerce.API/appsettings.json`
 - `appsettings.Development.json`, `appsettings.Production.json`
 
-Key sections: `ConnectionStrings`, `Jwt`, `OAuth`, `GoogleOAuth`, `Stripe`, `SendGrid`, `Redis`, `RabbitMQ`, `RateLimiting`, `KeyVault`, `Serilog`, `ApplicationInsights`.
+Key sections: `ConnectionStrings`, `Jwt`, `OAuth`, `GoogleOAuth`, `Stripe`, `SendGrid`, `Redis`, `RabbitMQ`, `RateLimiting`, `KeyVault`, `Serilog`, `ApplicationInsights`, `OpenTelemetry`.
+
+Each microservice has its own appsettings:
+- `Ecommerce.OrderService/appsettings.json`
+- `Ecommerce.ProductService/appsettings.json`
+- `Ecommerce.Functions/local.settings.json`
 
 ### Frontend
 
@@ -259,9 +306,9 @@ Key settings: `apiUrl`, OAuth client IDs, Stripe publishable key.
 
 Reference docs:
 
-- `WHERE_TO_STORE_SECRETS.md` (if present)
-- `EcommerceAPI/BulkyBook-POC/Guidline/SECRETS_MANAGEMENT_GUIDE.md`
-- `EcommerceAPI/BulkyBook-POC/Guidline/SECRETS_MIGRATION_CHECKLIST.md`
+- `docs/WHERE_TO_STORE_SECRETS.md`
+- `EcommerceAPI/BulkyBook-POC/Guideline/SECRETS_MANAGEMENT_GUIDE.md`
+- `EcommerceAPI/BulkyBook-POC/Guideline/SECRETS_MIGRATION_CHECKLIST.md`
 
 ---
 
@@ -320,25 +367,42 @@ docker compose --profile quality up -d sonarqube-db sonarqube
 
 ## Documentation Index
 
-### Root-level docs
+### Project docs (`docs/`)
 
-- `E-Commerce_Project_Presentation.md`
+- `E-Commerce_Project_Presentation.md` — Full project presentation
+- `CODEBASE_ANALYSIS.md` — Architecture and codebase overview
 - `API_RESPONSE_REFACTORING_SUMMARY.md`, `UI_RESPONSE_REFACTORING_SUMMARY.md`
 - `GOOGLE_OAUTH_IMPLEMENTATION.md`, `GUEST_USER_IMPLEMENTATION.md`
 - `REDIS_COMPREHENSIVE_IMPLEMENTATION.md`, `REDIS_IMPLEMENTATION_SUMMARY.md`
 - `EMAIL_IMPLEMENTATION_SUMMARY.md`, `EMAIL_DIAGNOSTIC_REPORT.md`, `SENDGRID_SETUP.md`
+- `WHERE_TO_STORE_SECRETS.md`, `Z_INDEX_SYSTEM.md`
+- `ECommerce Project Estimation.xlsx`
 
-### Backend guidelines
+### Backend guidelines (`EcommerceAPI/BulkyBook-POC/Guideline/`)
 
-- `EcommerceAPI/BulkyBook-POC/Guidline/README.md`
-- `HOW_TO_RUN_TESTS.md`, `RATE_LIMITING_TEST_GUIDE.md`
-- `RABBITMQ_IMPLEMENTATION_GUIDE.md`, `RESILIENCE_TESTING_GUIDE.md`
+- `README.md` — Getting started
+- `HOW_TO_RUN_TESTS.md`, `TEST_COVERAGE_SUMMARY.md`
+- `RATE_LIMITING_TEST_GUIDE.md`, `RATE_LIMITING_ENHANCEMENTS_COMPLETE.md`
+- `RABBITMQ_IMPLEMENTATION_GUIDE.md`
+- `RESILIENCE_TESTING_GUIDE.md`, `RESILIENCE_ENHANCEMENTS_COMPLETE.md`
+- `SECRETS_MANAGEMENT_GUIDE.md`, `SECRETS_MIGRATION_CHECKLIST.md`
+- `AUTHENTICATION_AUTHORIZATION_COMPLETE.md`
 
 ---
 
 ## Recommended Dev Flow
 
 1. Restore and build the backend; verify Swagger at `https://localhost:7273/swagger`.
-2. Start the frontend; verify login and product listing.
-3. Run backend and frontend tests before pushing.
-4. Keep all secrets out of source; use User Secrets or env vars.
+2. Verify GraphQL playground at `https://localhost:7273/graphql`.
+3. Start the frontend; verify login and product listing.
+4. Run backend and frontend tests before pushing.
+5. Keep all secrets out of source; use User Secrets or env vars.
+
+## Microservices
+
+| Service | Port | Responsibilities |
+|---------|------|------------------|
+| **Ecommerce.API** | 7273 | Main gateway — REST, GraphQL, gRPC, OData, admin endpoints |
+| **Ecommerce.OrderService** | — | Order CRUD, status updates, GraphQL subscriptions |
+| **Ecommerce.ProductService** | — | Product catalog, GraphQL queries/mutations, OData |
+| **Ecommerce.Functions** | — | Azure Durable Functions: order fulfillment orchestrator, EventGrid triggers, dead letter processing, stock replenishment |
