@@ -89,6 +89,9 @@ public static class ServiceCollectionExtensions
             services.AddScoped<IMessagePublisherService, NoOpMessagePublisherService>();
         }
 
+        // Event Grid Publisher Service
+        services.AddHttpClient<IEventGridPublisherService, EventGridPublisherService>();
+
         return services;
     }
 

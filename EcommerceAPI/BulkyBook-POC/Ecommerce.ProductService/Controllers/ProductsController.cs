@@ -1,17 +1,20 @@
-﻿using Ecommerce.Application.Common.Models;
+using Ecommerce.Application.Common.Models;
+using Ecommerce.Application.Features.Products;
 using Ecommerce.Application.Features.Products.Commands;
 using Ecommerce.Application.Features.Products.Models;
 using Ecommerce.Application.Features.Products.Queries;
+using Ecommerce.Infrastructure.Persistence;
+using Ecommerce.Infrastructure.Services;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.OData.Query;
 using Serilog;
-using System;
 using System.IO;
 using System.Linq;
 
-namespace Ecommerce.API.Controllers
+namespace Ecommerce.ProductService.Controllers
 {
     [Route("api/products")]
     [ApiController]
@@ -19,11 +22,13 @@ namespace Ecommerce.API.Controllers
     {
         private readonly IMediator _mediator;
         private readonly IWebHostEnvironment _env;
-
-        public ProductsController(IMediator mediator, IWebHostEnvironment env)
+        private readonly IEventGridPublisherService _eventGridPublisher;
+ 
+        public ProductsController(IMediator mediator, IWebHostEnvironment env, IEventGridPublisherService eventGridPublisher)
         {
             _mediator = mediator;
             _env = env;
+            _eventGridPublisher = eventGridPublisher;
         }
 
         [HttpGet]
@@ -35,10 +40,12 @@ namespace Ecommerce.API.Controllers
                 {
                     return ValidationErrorResponse("Page number must be greater than 0.");
                 }
+
                 if (query.PageSize <= 0)
                 {
                     return ValidationErrorResponse("Page size must be greater than 0.");
                 }
+
                 var result = await _mediator.Send(query);
                 return SuccessResponse(result, "Success", "Products retrieved successfully");
             }
@@ -46,7 +53,37 @@ namespace Ecommerce.API.Controllers
             {
                 return HandleException(ex, "Unable to retrieve products at this time. Please try again or contact support if the issue persists.");
             }
-            
+        }
+
+        [HttpGet("{id:int}")]
+        public async Task<ActionResult<ProductViewModel>> GetProductById(int id)
+        {
+            try
+            {
+                var result = await _mediator.Send(new GetProductByIdQuery { ProductId = id });
+                if (result == null)
+                {
+                    return NotFoundResponse<ProductViewModel>("Product not found");
+                }
+
+                return SuccessResponse(result, "Success", "Product retrieved successfully");
+            }
+            catch (Exception ex)
+            {
+                return HandleException<ProductViewModel>(ex, "Unable to retrieve the requested product. Please try again or contact support if the issue persists.");
+            }
+        }
+
+        [HttpGet("odata")]
+        [Authorize(Policy = "CustomerOrAdmin")]
+        [EnableQuery(PageSize = 100)]
+        public IActionResult GetProductsOData([FromServices] AppDbContext dbContext)
+        {
+            var query = dbContext.Products
+                .Where(product => !product.IsDeleted)
+                .Select(ProductMappings.ToViewModelExpression);
+
+            return Ok(query);
         }
 
         [HttpGet("admin")]
@@ -71,6 +108,7 @@ namespace Ecommerce.API.Controllers
             try
             {
                 var id = await _mediator.Send(command);
+                await _eventGridPublisher.PublishProductUpdatedAsync(id, command.Name, "Created");
                 return SuccessResponse(new { productId = id }, "Success", "Product created successfully");
             }
             catch (Exception ex)
@@ -96,6 +134,7 @@ namespace Ecommerce.API.Controllers
                     ImageUrl = imageUrl ?? string.Empty
                 };
                 var id = await _mediator.Send(command);
+                await _eventGridPublisher.PublishProductUpdatedAsync(id, command.Name, "Created");
                 return SuccessResponse(new { productId = id }, "Success", "Product created successfully with image");
             }
             catch (Exception ex)
@@ -108,11 +147,20 @@ namespace Ecommerce.API.Controllers
         [Authorize(Roles = "Admin")]
         public async Task<ActionResult<object>> Update(int id, [FromBody] UpdateProductCommand command)
         {
-            if (id != command.ProductId) return ValidationErrorResponse("Mismatched product id");
+            if (id != command.ProductId)
+            {
+                return ValidationErrorResponse("Mismatched product id");
+            }
+
             try
             {
                 var ok = await _mediator.Send(command);
-                if (!ok) return NotFoundResponse("Product not found");
+                if (!ok)
+                {
+                    return NotFoundResponse("Product not found");
+                }
+ 
+                await _eventGridPublisher.PublishProductUpdatedAsync(command.ProductId, command.Name, "Updated");
                 return SuccessResponse(new { success = true }, "Success", "Product updated successfully");
             }
             catch (Exception ex)
@@ -125,7 +173,11 @@ namespace Ecommerce.API.Controllers
         [Authorize(Roles = "Admin")]
         public async Task<ActionResult<object>> UpdateWithImage(int id, [FromForm] UpdateProductWithImageRequest request)
         {
-            if (id != request.ProductId) return ValidationErrorResponse("Mismatched product id");
+            if (id != request.ProductId)
+            {
+                return ValidationErrorResponse("Mismatched product id");
+            }
+
             try
             {
                 var imageUrl = await SaveImageIfProvided(request.Image);
@@ -140,7 +192,12 @@ namespace Ecommerce.API.Controllers
                     ImageUrl = imageUrl ?? request.ImageUrl ?? string.Empty
                 };
                 var ok = await _mediator.Send(command);
-                if (!ok) return NotFoundResponse("Product not found");
+                if (!ok)
+                {
+                    return NotFoundResponse("Product not found");
+                }
+ 
+                await _eventGridPublisher.PublishProductUpdatedAsync(command.ProductId, command.Name, "Updated");
                 return SuccessResponse(new { success = true }, "Success", "Product updated successfully with image");
             }
             catch (Exception ex)
@@ -156,7 +213,12 @@ namespace Ecommerce.API.Controllers
             try
             {
                 var ok = await _mediator.Send(new DeleteProductCommand { ProductId = id });
-                if (!ok) return NotFoundResponse("Product not found");
+                if (!ok)
+                {
+                    return NotFoundResponse("Product not found");
+                }
+ 
+                await _eventGridPublisher.PublishProductUpdatedAsync(id, "DeletedProduct", "Deleted");
                 return SuccessResponse(new { success = true }, "Success", "Product deleted successfully");
             }
             catch (Exception ex)
@@ -172,7 +234,11 @@ namespace Ecommerce.API.Controllers
             try
             {
                 var ok = await _mediator.Send(new DeleteProductCommand { ProductId = id, Restore = true });
-                if (!ok) return NotFoundResponse("Product not found");
+                if (!ok)
+                {
+                    return NotFoundResponse("Product not found");
+                }
+
                 return SuccessResponse(new { success = true }, "Success", "Product restored successfully");
             }
             catch (Exception ex)
@@ -187,44 +253,54 @@ namespace Ecommerce.API.Controllers
         {
             try
             {
-                var uploadsDir = Path.Combine(_env.ContentRootPath, "Uploads", "products");
-                var filePath = Path.Combine(uploadsDir, fileName);
-                if (!System.IO.File.Exists(filePath)) return NotFound();
+                var uploadsDir = System.IO.Path.Combine(_env.ContentRootPath, "Uploads", "products");
+                var filePath = System.IO.Path.Combine(uploadsDir, fileName);
+                if (!System.IO.File.Exists(filePath))
+                {
+                    return NotFound();
+                }
+
                 var contentType = GetContentType(filePath);
                 var stream = System.IO.File.OpenRead(filePath);
                 return File(stream, contentType);
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "❌ Error serving product image");
+                Log.Error(ex, "Error serving product image");
                 return StatusCode(500, "Unable to retrieve the requested image. Please try again or contact support if the issue persists.");
             }
         }
 
         private async Task<string?> SaveImageIfProvided(IFormFile? image)
         {
-            if (image == null || image.Length == 0) return null;
+            if (image == null || image.Length == 0)
+            {
+                return null;
+            }
 
             var allowed = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp" };
-            var ext = Path.GetExtension(image.FileName).ToLowerInvariant();
-            if (!allowed.Contains(ext)) throw new InvalidOperationException("Unsupported image type");
+            var ext = System.IO.Path.GetExtension(image.FileName).ToLowerInvariant();
+            if (!allowed.Contains(ext))
+            {
+                throw new InvalidOperationException("Unsupported image type");
+            }
 
-            var uploadsDir = Path.Combine(_env.ContentRootPath, "Uploads", "products");
-            Directory.CreateDirectory(uploadsDir);
+            var uploadsDir = System.IO.Path.Combine(_env.ContentRootPath, "Uploads", "products");
+            System.IO.Directory.CreateDirectory(uploadsDir);
             var fileName = $"{Guid.NewGuid():N}{ext}";
-            var filePath = Path.Combine(uploadsDir, fileName);
-            using (var stream = new FileStream(filePath, FileMode.Create))
+            var filePath = System.IO.Path.Combine(uploadsDir, fileName);
+            await using (var stream = new System.IO.FileStream(filePath, System.IO.FileMode.Create, System.IO.FileAccess.Write))
             {
                 await image.CopyToAsync(stream);
             }
+
             var baseUrl = $"{Request.Scheme}://{Request.Host}";
-            var url = $"{baseUrl}/api/products/image/{fileName}";
-            return url;
+            return $"{baseUrl}/api/products/image/{fileName}";
         }
 
         private static string GetContentType(string path)
         {
-            var ext = Path.GetExtension(path).ToLowerInvariant();
+            var ext = System.IO.Path.GetExtension(path).ToLowerInvariant();
             return ext switch
             {
                 ".jpg" => "image/jpeg",
@@ -235,6 +311,5 @@ namespace Ecommerce.API.Controllers
                 _ => "application/octet-stream"
             };
         }
-
     }
 }

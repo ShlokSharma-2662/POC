@@ -37,7 +37,7 @@ namespace Ecommerce.Infrastructure.Caching
         }
         
         // Public product list with filters
-        public static string PublicProductsWithFilters(int pageNumber, int pageSize, int? categoryId, string? searchTerm, decimal? minPrice = null, decimal? maxPrice = null, string? categoryName = null)
+        public static string PublicProductsWithFilters(int pageNumber, int pageSize, int? categoryId, string? searchTerm, decimal? minPrice = null, decimal? maxPrice = null, string? categoryName = null, bool? inStockOnly = null)
         {
             var key = $"products_public_p{pageNumber}_s{pageSize}";
             
@@ -55,6 +55,9 @@ namespace Ecommerce.Infrastructure.Caching
             
             if (!string.IsNullOrWhiteSpace(categoryName))
                 key += $"_cat_{categoryName.ToLower().Replace(" ", "_")}";
+
+            if (inStockOnly.HasValue)
+                key += $"_stock_{(inStockOnly.Value ? "in" : "all")}";
             
             return key;
         }

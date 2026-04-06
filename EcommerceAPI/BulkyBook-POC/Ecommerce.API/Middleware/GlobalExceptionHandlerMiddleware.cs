@@ -118,7 +118,7 @@ namespace Ecommerce.API.Middleware
                 ),
 
                 // Not found errors - 404 Not Found
-                KeyNotFoundException keyNotFoundEx => (
+                System.Collections.Generic.KeyNotFoundException keyNotFoundEx => (
                     HttpStatusCode.NotFound,
                     "NotFound",
                     keyNotFoundEx.Message ?? "The requested resource was not found."

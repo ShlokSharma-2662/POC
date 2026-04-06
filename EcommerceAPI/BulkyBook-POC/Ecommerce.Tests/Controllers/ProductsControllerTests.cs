@@ -1,4 +1,4 @@
-using Ecommerce.API.Controllers;
+using Ecommerce.ProductService.Controllers;
 using Ecommerce.Application.Common.Models;
 using Ecommerce.Application.Features.Products.Commands;
 using Ecommerce.Application.Features.Products.Models;
@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Hosting;
 using Moq;
+using Ecommerce.Infrastructure.Services;
 using System.IO;
 
 namespace Ecommerce.Tests.Controllers
@@ -19,13 +20,15 @@ namespace Ecommerce.Tests.Controllers
     {
         private readonly Mock<IMediator> _mockMediator;
         private readonly Mock<IWebHostEnvironment> _mockWebHostEnvironment;
+        private readonly Mock<IEventGridPublisherService> _mockEventGridPublisher;
         private readonly ProductsController _controller;
 
         public ProductsControllerTests()
         {
             _mockMediator = new Mock<IMediator>();
             _mockWebHostEnvironment = new Mock<IWebHostEnvironment>();
-            _controller = new ProductsController(_mockMediator.Object, _mockWebHostEnvironment.Object);
+            _mockEventGridPublisher = new Mock<IEventGridPublisherService>();
+            _controller = new ProductsController(_mockMediator.Object, _mockWebHostEnvironment.Object, _mockEventGridPublisher.Object);
             SetupHttpContext();
         }
 

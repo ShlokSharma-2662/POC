@@ -22,8 +22,7 @@ namespace Ecommerce.Application.Features.Admin.Handlers
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == request.UserId, cancellationToken);
             if (user == null) return false;
 
-            // validate role basic set (Admin/User) - extend with Role table if needed
-            var validRoles = new[] { "Admin", "User" };
+            var validRoles = new[] { "Admin", "User", "Customer", "WarehouseManager" };
             if (!validRoles.Contains(request.Role))
                 throw new ArgumentException("Invalid role.");
 

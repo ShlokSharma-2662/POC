@@ -1,8 +1,9 @@
 using Ecommerce.Application.Common.Models;
-using Ecommerce.Application.Features.Products.Queries;
+using Ecommerce.Application.Features.Products;
 using Ecommerce.Application.Features.Products.Models;
-using Ecommerce.Infrastructure.Persistence;
+using Ecommerce.Application.Features.Products.Queries;
 using Ecommerce.Infrastructure.Caching;
+using Ecommerce.Infrastructure.Persistence;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -26,15 +27,13 @@ namespace Ecommerce.Application.Features.Products.Handlers
 
         public async Task<PagedResult<ProductViewModel>> Handle(GetAllProductsAdminQuery request, CancellationToken cancellationToken)
         {
-            // Generate cache key based on request parameters
             var cacheKey = CacheKeyBuilder.AdminProductsWithFilters(
-                request.PageNumber, 
-                request.PageSize, 
-                request.IsDeleted, 
-                request.CategoryId, 
+                request.PageNumber,
+                request.PageSize,
+                request.IsDeleted,
+                request.CategoryId,
                 request.Search);
 
-            // Try to get data from cache first
             if (_isCacheEnabled == "true")
             {
                 var cachedData = await _cacheService.GetAsync<PagedResult<ProductViewModel>>(cacheKey);
@@ -44,44 +43,33 @@ namespace Ecommerce.Application.Features.Products.Handlers
                 }
             }
 
-            // If not in cache, fetch from database
-            var query = _context.Products.AsQueryable();
+            var query = _context.Products.AsNoTracking().AsQueryable();
 
             if (request.IsDeleted.HasValue)
             {
-                query = query.Where(p => p.IsDeleted == request.IsDeleted.Value);
+                query = query.Where(product => product.IsDeleted == request.IsDeleted.Value);
             }
 
             if (request.CategoryId.HasValue && request.CategoryId.Value > 0)
             {
-                query = query.Where(p => p.CategoryId == request.CategoryId.Value);
+                query = query.Where(product => product.CategoryId == request.CategoryId.Value);
             }
 
             if (!string.IsNullOrWhiteSpace(request.Search))
             {
-                var term = request.Search.ToLower();
-                query = query.Where(p => p.Name.ToLower().Contains(term) || p.Description.ToLower().Contains(term));
+                var term = request.Search.ToLowerInvariant();
+                query = query.Where(product =>
+                    product.Name.ToLower().Contains(term) ||
+                    product.Description.ToLower().Contains(term));
             }
 
             var total = await query.CountAsync(cancellationToken);
 
             var items = await query
-                .Include(p => p.Category)
-                .OrderBy(p => p.Name)
+                .OrderBy(product => product.Name)
                 .Skip((request.PageNumber - 1) * request.PageSize)
                 .Take(request.PageSize)
-                .Select(p => new ProductViewModel
-                {
-                    ProductId = p.ProductId,
-                    Name = p.Name,
-                    Description = p.Description,
-                    Price = p.Price,
-                    ImageUrl = p.ImageUrl,
-                    Stock = p.Stock,
-                    CategoryId = p.CategoryId,
-                    CategoryName = p.Category != null ? p.Category.Name : string.Empty,
-                    IsDeleted = p.IsDeleted
-                })
+                .Select(ProductMappings.ToViewModelExpression)
                 .ToListAsync(cancellationToken);
 
             var result = new PagedResult<ProductViewModel>
@@ -90,7 +78,6 @@ namespace Ecommerce.Application.Features.Products.Handlers
                 TotalCount = total
             };
 
-            // Cache the result for future requests
             if (_isCacheEnabled == "true")
             {
                 await _cacheService.SetAsync(cacheKey, result);
@@ -100,6 +87,3 @@ namespace Ecommerce.Application.Features.Products.Handlers
         }
     }
 }
-
-
-
