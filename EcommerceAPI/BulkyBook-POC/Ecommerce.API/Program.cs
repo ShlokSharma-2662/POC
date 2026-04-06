@@ -1,6 +1,8 @@
 using AspNetCoreRateLimit;
 using Azure.Extensions.AspNetCore.Configuration.Secrets;
 using Azure.Identity;
+using Ecommerce.API.GraphQL;
+using Ecommerce.API.GrpcServices;
 using Ecommerce.API.Middleware;
 using Ecommerce.Infrastructure.DependencyInjection;
 using Ecommerce.Infrastructure.Persistence;
@@ -8,8 +10,11 @@ using FluentValidation;
 using FluentValidation.AspNetCore;
 using MediatR;
 using Microsoft.AspNetCore.Mvc.Versioning;
+using Microsoft.AspNetCore.OData;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 using Serilog;
 using System.Reflection;
 
@@ -46,6 +51,9 @@ if (keyVaultEnabled && !string.IsNullOrEmpty(keyVaultName))
 builder.Services.AddEcommerceServices(builder.Configuration);
 builder.Services.AddMediatR(Assembly.Load("Ecommerce.Application"));
 
+// gRPC
+builder.Services.AddGrpc();
+
 builder.Services.AddSession(options =>
 {
     options.IdleTimeout = TimeSpan.FromMinutes(30);
@@ -72,6 +80,33 @@ builder.Services.AddCors(options =>
     });
 });
 builder.Services.AddScoped<Ecommerce.Application.Common.Services.IUserContextService, Ecommerce.Application.Common.Services.UserContextService>();
+
+// OData
+builder.Services.AddControllers()
+    .AddOData(options => options.Select().Filter().OrderBy().Count().SetMaxTop(100));
+
+// GraphQL (Hot Chocolate)
+builder.Services
+    .AddGraphQLServer()
+    .AddQueryType<ProductQuery>()
+    .AddMutationType<ProductMutation>()
+    .AddSubscriptionType<RealtimeSubscription>()
+    .AddInMemorySubscriptions();
+
+// OpenTelemetry
+var serviceName = builder.Configuration["OpenTelemetry:ServiceName"] ?? "Ecommerce.API";
+var serviceVersion = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "1.0.0";
+
+builder.Services.AddOpenTelemetry()
+    .ConfigureResource(resource => resource.AddService(serviceName, serviceVersion: serviceVersion))
+    .WithTracing(tracing =>
+    {
+        tracing
+            .AddAspNetCoreInstrumentation()
+            .AddHttpClientInstrumentation()
+            .AddSqlClientInstrumentation();
+    });
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
@@ -178,6 +213,11 @@ app.UseMiddleware<GlobalExceptionHandlerMiddleware>();
 app.UseMiddleware<RequestTimingMiddleware>();
 app.UseMiddleware<RequestTimeoutMiddleware>();
 
+app.UseWebSockets();
+
+app.MapGraphQL("/graphql").RequireAuthorization();
+app.MapGrpcService<ProductGrpcService>();
+app.MapGrpcReflectionService();
 app.MapControllers();
 
 app.Run();
