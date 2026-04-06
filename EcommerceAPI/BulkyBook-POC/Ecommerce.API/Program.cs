@@ -180,6 +180,7 @@ using (var scope = app.Services.CreateScope())
 
 app.UseSerilogRequestLogging();
 app.UseHttpsRedirection();
+app.UseStaticFiles();
 app.UseSession();
 app.UseCors("AllowAll");
 app.UseAuthentication();
