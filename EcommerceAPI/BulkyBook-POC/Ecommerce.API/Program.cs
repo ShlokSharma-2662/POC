@@ -53,6 +53,7 @@ builder.Services.AddMediatR(Assembly.Load("Ecommerce.Application"));
 
 // gRPC
 builder.Services.AddGrpc();
+builder.Services.AddGrpcReflection();
 
 builder.Services.AddSession(options =>
 {
