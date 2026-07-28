@@ -7,7 +7,7 @@ Enterprise-grade full-stack e-commerce system built as a **modular, cloud-native
 | **Backend** | ASP.NET Core 9 · CQRS (MediatR) · Entity Framework Core · SQL Server |
 | **Microservices** | Ecommerce.API · OrderService · ProductService · Azure Functions |
 | **API Layers** | REST · GraphQL (Hot Chocolate) · gRPC · OData |
-| **Frontend** | Angular 19 · Bootstrap 5 · RxJS |
+| **Frontend** | React 19 · Vite · TypeScript · Bootstrap 5 (Angular 19 retained during migration) |
 | **Infra** | Docker Compose · Redis · RabbitMQ · Azure Event Grid · SonarQube |
 
 ---
@@ -47,7 +47,7 @@ Enterprise-grade full-stack e-commerce system built as a **modular, cloud-native
 | **Observability** | Serilog, Application Insights, OpenTelemetry tracing |
 | **Validation** | FluentValidation pipeline behaviors (validation, logging, performance) |
 | **Resilience** | Polly policies, rate limiting (IP + client) |
-| **Quality** | Backend (xUnit) and frontend (Karma/Jasmine) automated tests |
+| **Quality** | Backend (xUnit) and frontend (Vitest/Testing Library/Playwright) automated tests |
 
 ---
 
@@ -55,7 +55,7 @@ Enterprise-grade full-stack e-commerce system built as a **modular, cloud-native
 
 ```
 ┌─────────────────┐
-│   Angular 19    │
+│    React 19     │
 │   (Port 4200)   │
 └────────┬────────┘
          │ HTTP / WebSocket
@@ -106,7 +106,8 @@ POC/
 │       ├── Guideline/                # Backend guides and docs
 │       ├── scripts/                  # Backend utility scripts
 │       └── Ecommerce.sln
-├── ecommerce-ui/                     # Angular frontend
+├── ecommerce-react/                  # React frontend
+├── ecommerce-ui/                     # Legacy Angular frontend / rollback artifact
 ├── assets/                           # Product images
 ├── config/                           # Web.config variants
 ├── docs/                             # All project documentation
@@ -143,15 +144,16 @@ POC/
 
 ### Frontend
 
-- Angular 19 (standalone components)
-- RxJS, Bootstrap 5, SCSS
-- Chart.js / ng2-charts
-- ngx-toastr, Stripe.js
+- React 19, TypeScript, Vite, React Router
+- TanStack Query, Zustand, Bootstrap 5, SCSS
+- Chart.js / react-chartjs-2
+- Sonner, React Stripe.js
+- Angular 19 remains available in `ecommerce-ui/` as the rollback artifact
 
 ### Testing
 
-- Backend: xUnit, Moq, FluentAssertions, AutoFixture
-- Frontend: Karma, Jasmine
+- Backend: xUnit, Moq, FluentAssertions
+- Frontend: Vitest, Testing Library, Playwright
 
 ---
 
@@ -161,7 +163,7 @@ POC/
 |-------------|-------|
 | **Windows + PowerShell** | Primary dev environment |
 | **.NET SDK 9** | `dotnet --version` |
-| **Node.js 20+** | For Angular |
+| **Node.js 22+** | For the React/Vite frontend |
 | **SQL Server / LocalDB** | Local development |
 | **Docker Desktop** | For full stack and optional services |
 | **Optional** | Redis, RabbitMQ, Azure Functions Core Tools (or use Docker) |
@@ -182,21 +184,34 @@ cd D:\POC_NEW\POC
 dotnet restore EcommerceAPI\BulkyBook-POC\Ecommerce.sln
 dotnet build EcommerceAPI\BulkyBook-POC\Ecommerce.sln
 dotnet run --project EcommerceAPI\BulkyBook-POC\Ecommerce.API
+dotnet run --project EcommerceAPI\BulkyBook-POC\Ecommerce.OrderService
 ```
 
 - API: `https://localhost:7273`
 - Swagger: `https://localhost:7273/swagger`
 - GraphQL Playground: `https://localhost:7273/graphql`
 
+Seed the local `ECommercePOC` LocalDB with repeatable development data:
+
+```powershell
+.\scripts\seed-localdb.ps1
+```
+
+- Admin login: `admin@local.test` / `Admin123!`
+- User login: `user@local.test` / `User123!`
+- The seed is local-development-only and can be run repeatedly without
+  duplicating its users, categories, or products.
+
 ### 3. Frontend
 
 ```powershell
-cd ecommerce-ui
-npm install
-npm start
+cd ecommerce-react
+npm ci
+npm run dev
 ```
 
 - UI: `http://localhost:4200`
+- Migration and cutover details: `docs/REACT_MIGRATION.md`
 
 ---
 
@@ -206,7 +221,7 @@ npm start
 
 ```powershell
 Copy-Item .env.example .env
-# Edit .env and set SQL_SA_PASSWORD, JWT_SECRET_KEY
+# Edit .env and set SQL_SA_PASSWORD, JWT_SECRET_KEY, and both Stripe keys
 ```
 
 ### Start full stack
@@ -215,10 +230,27 @@ Copy-Item .env.example .env
 docker compose up --build -d
 ```
 
+Before enabling checkout against an existing database, apply
+`EcommerceAPI\BulkyBook-POC\Ecommerce.Infrastructure\Persistence\Migrations\20260728_secure_checkout.sql`.
+See `docs\REACT_MIGRATION.md` for OAuth callbacks, required secrets, and the
+credentialed release gates.
+
+Seed the Docker database after the stack has been created:
+
+```powershell
+.\scripts\seed-docker.ps1
+```
+
+The runner seeds `EcommerceDB` inside `ecommerce-sqlserver`, reads the SA
+password from the container environment, and invalidates stale product,
+category, and user cache entries. It does not print or copy the database
+password to the host command line.
+
 | Service | URL |
 |---------|-----|
 | UI | http://localhost:4200 |
 | API | http://localhost:7273 |
+| OrderService | http://localhost:7274 |
 | Swagger | http://localhost:7273/swagger |
 | GraphQL | http://localhost:7273/graphql |
 | RabbitMQ Management | http://localhost:15672 |
@@ -229,12 +261,20 @@ docker compose up --build -d
 docker compose down
 ```
 
+The retained Angular rollback can be started separately at
+`http://localhost:4201` with
+`docker compose --profile legacy up -d ecommerce-angular`.
+
 ### Environment variables (`.env`)
 
 | Variable | Description | Example |
 |----------|-------------|---------|
 | `SQL_SA_PASSWORD` | SQL Server SA password | `YourStrong@Passw0rd` |
 | `JWT_SECRET_KEY` | JWT signing key | Change for production |
+| `STRIPE_PUBLISHABLE_KEY` | Public Stripe key compiled into the React UI | `pk_test_...` |
+| `STRIPE_SECRET_KEY` | Server-only Stripe API key; never expose it to Vite | `sk_test_...` |
+| `FRONTEND_BASE_URL` | Canonical browser origin used for redirects and CORS | `http://localhost:4200` |
+| `PUBLIC_APP_BASE_URL` | Public origin through which OAuth reaches `/api` callbacks | `http://localhost:4200` |
 | `SONARQUBE_DB_*` | SonarQube (quality profile) | See `.env.example` |
 | `SONAR_HOST_URL` | SonarQube URL | `http://localhost:9000` |
 | `SONAR_TOKEN` | SonarQube auth token | From SonarQube UI |
@@ -259,14 +299,20 @@ dotnet test EcommerceAPI\BulkyBook-POC\Ecommerce.sln --collect:"XPlat Code Cover
 ### Frontend
 
 ```powershell
-cd ecommerce-ui
+cd ecommerce-react
 
-# Run tests
+# Typecheck, lint, and tests
+npm run typecheck
+npm run lint
 npm test
 
 # Production build
 npm run build
-# Output: ecommerce-ui/dist/ecommerce-ui/
+# Output: ecommerce-react/dist/
+
+# Desktop and mobile browser smoke tests
+npx playwright install chromium
+npm run e2e
 ```
 
 ---
@@ -287,10 +333,11 @@ Each microservice has its own appsettings:
 
 ### Frontend
 
-- `ecommerce-ui/src/environments/environment.ts`
-- `ecommerce-ui/src/environments/environment.prod.ts`
+- `ecommerce-react/.env.example`
+- `ecommerce-react/src/config/environment.ts`
 
-Key settings: `apiUrl`, OAuth client IDs, Stripe publishable key.
+Key public settings: `VITE_API_BASE_URL`, `VITE_DEV_API_TARGET`,
+`VITE_DEV_ORDER_API_TARGET`, and `VITE_STRIPE_PUBLISHABLE_KEY`.
 
 ---
 
@@ -318,7 +365,7 @@ Reference docs:
 
 - **File:** `.github/workflows/dotnet.yml`
 - **Triggers:** Push and pull requests to `Dev`
-- **Actions:** Restore, build (.NET 8)
+- **Actions:** Build/test .NET 9; typecheck, lint, test, build, browser-test, and containerize React
 
 ```yaml
 on:
@@ -361,7 +408,7 @@ docker compose --profile quality up -d sonarqube-db sonarqube
 | `MSB1003` on `dotnet build` | Wrong directory | Use full path: `dotnet build EcommerceAPI\BulkyBook-POC\Ecommerce.sln` |
 | Invalid Sonar token/URL | Missing env vars | Set `SONAR_TOKEN`, `SONAR_HOST_URL` in `.env` or environment |
 | Sonar `localhost:9000` refused (CI) | GitHub runner can't reach local SonarQube | Use cloud SonarQube or self-hosted runner |
-| Frontend 401/403/429 or CORS | API unreachable, auth, or rate limits | Check `apiUrl`, JWT interceptor, CORS, rate-limit headers |
+| Frontend 401/403/429 or CORS | API unreachable, auth, or rate limits | Check `VITE_API_BASE_URL`, JWT storage, CORS, and rate-limit headers |
 
 ---
 
@@ -403,6 +450,6 @@ docker compose --profile quality up -d sonarqube-db sonarqube
 | Service | Port | Responsibilities |
 |---------|------|------------------|
 | **Ecommerce.API** | 7273 | Main gateway — REST, GraphQL, gRPC, OData, admin endpoints |
-| **Ecommerce.OrderService** | — | Order CRUD, status updates, GraphQL subscriptions |
+| **Ecommerce.OrderService** | 7274 | Order CRUD, status updates, GraphQL subscriptions |
 | **Ecommerce.ProductService** | — | Product catalog, GraphQL queries/mutations, OData |
 | **Ecommerce.Functions** | — | Azure Durable Functions: order fulfillment orchestrator, EventGrid triggers, dead letter processing, stock replenishment |

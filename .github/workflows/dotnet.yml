@@ -1,7 +1,7 @@
 # This workflow will build a .NET project
 # For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-net
 
-name: .NET
+name: Build and test
 
 on:
   push:
@@ -10,7 +10,7 @@ on:
     branches: [ "Dev" ]
 
 jobs:
-  build:
+  backend:
     runs-on: ubuntu-latest
 
     steps:
@@ -19,10 +19,54 @@ jobs:
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: 8.0.x
+        dotnet-version: 9.0.x
 
     - name: Restore dependencies
       run: dotnet restore EcommerceAPI/BulkyBook-POC/Ecommerce.sln
 
     - name: Build
-      run: dotnet build EcommerceAPI/BulkyBook-POC/Ecommerce.sln --no-restore
+      run: dotnet build EcommerceAPI/BulkyBook-POC/Ecommerce.sln --no-restore --configuration Release
+
+    - name: Test
+      run: dotnet test EcommerceAPI/BulkyBook-POC/Ecommerce.sln --no-build --configuration Release
+
+  react-frontend:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ecommerce-react
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup Node
+      uses: actions/setup-node@v4
+      with:
+        node-version: 22
+        cache: npm
+        cache-dependency-path: ecommerce-react/package-lock.json
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Typecheck
+      run: npm run typecheck
+
+    - name: Lint
+      run: npm run lint
+
+    - name: Unit tests
+      run: npm test
+
+    - name: Production build
+      run: npm run build
+
+    - name: Install Playwright Chromium
+      run: npx playwright install --with-deps chromium
+
+    - name: Browser smoke tests
+      run: npm run e2e
+
+    - name: Container build
+      run: docker build --tag ecommerce-react:ci .

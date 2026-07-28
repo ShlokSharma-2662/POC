@@ -1,10 +1,10 @@
 using Ecommerce.Application.Common.Models;
 using Ecommerce.Application.Features.Payments.Models;
+using Ecommerce.Domain.Interfaces;
+using Ecommerce.Domain.Payments;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Stripe;
-using Stripe.Checkout;
-using System.Text.Json;
+using System.Security.Claims;
 
 namespace Ecommerce.API.Controllers
 {
@@ -12,83 +12,72 @@ namespace Ecommerce.API.Controllers
     [ApiController]
     public class PaymentsController : BaseController
     {
-        private readonly IConfiguration _configuration;
+        private readonly ISecureCheckoutPaymentService _paymentService;
+        private readonly ILogger<PaymentsController> _logger;
 
-        public PaymentsController(IConfiguration configuration)
+        public PaymentsController(
+            ISecureCheckoutPaymentService paymentService,
+            ILogger<PaymentsController> logger)
         {
-            _configuration = configuration;
-            StripeConfiguration.ApiKey = _configuration["Stripe:SecretKey"];
+            _paymentService = paymentService;
+            _logger = logger;
         }
 
         [Authorize]
         [HttpPost("create-payment-intent")]
-        public async Task<IActionResult> CreatePaymentIntent([FromBody] CreatePaymentIntentRequest request)
+        public async Task<IActionResult> CreatePaymentIntent(
+            [FromBody] CreatePaymentIntentRequest? request,
+            CancellationToken cancellationToken)
         {
             try
             {
-                Console.WriteLine($"Payment intent request received: Amount={request.Amount}, Currency={request.Currency}");
-                
-                if (request.Amount <= 0) 
+                var userIdValue = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                if (!long.TryParse(userIdValue, out var userId))
                 {
-                    Console.WriteLine("Invalid amount provided");
-                    return ValidationErrorResponse("Invalid amount");
+                    return UnauthorizedResponse("A valid authenticated user is required.");
                 }
 
-                Console.WriteLine($"Stripe API Key configured: {!string.IsNullOrEmpty(_configuration["Stripe:SecretKey"])}");
-
-                var options = new PaymentIntentCreateOptions
+                if (request?.Items == null || request.Items.Count == 0)
                 {
-                    Amount = request.Amount,
-                    Currency = request.Currency,
-                    AutomaticPaymentMethods = new PaymentIntentAutomaticPaymentMethodsOptions
-                    {
-                        Enabled = true
-                    },
-                    Metadata = request.Metadata
-                };
+                    return ValidationErrorResponse("The cart must contain at least one item.");
+                }
 
-                Console.WriteLine("Creating Stripe payment intent...");
-                var service = new PaymentIntentService();
-                var intent = await service.CreateAsync(options);
-                Console.WriteLine($"Stripe payment intent created: {intent.Id}, ClientSecret: {intent.ClientSecret?.Substring(0, 20)}...");
+                var result = await _paymentService.CreatePaymentIntentAsync(
+                    userId,
+                    request.Items
+                        .Select(item => new PaymentCartItem(item.ProductId, item.Quantity))
+                        .ToArray(),
+                    request.CheckoutReference,
+                    cancellationToken);
 
-                var responseData = new { clientSecret = intent.ClientSecret };
-                Console.WriteLine($"Creating ApiResponse with data: {System.Text.Json.JsonSerializer.Serialize(responseData)}");
-                
-                var apiResponse = new ApiResponse<object>
+                return Ok(new ApiResponse<object>
                 {
                     IsSuccessful = true,
                     Status = "Success",
-                    StatusReason = "Payment intent created successfully",
-                    Data = responseData
-                };
-                
-                Console.WriteLine($"Final ApiResponse: {System.Text.Json.JsonSerializer.Serialize(apiResponse)}");
-                return Ok(apiResponse);
+                    StatusReason = "Payment intent created from the current server price.",
+                    Data = new
+                    {
+                        paymentIntentId = result.PaymentIntentId,
+                        clientSecret = result.ClientSecret,
+                        amount = result.AmountMinor,
+                        currency = result.Currency,
+                        cartFingerprint = result.CartFingerprint
+                    }
+                });
+            }
+            catch (PaymentValidationException ex)
+            {
+                return ValidationErrorResponse(ex.Message);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Exception in payment intent creation: {ex.Message}");
-                Console.WriteLine($"Stack trace: {ex.StackTrace}");
-                
-                // Provide more specific error messages based on exception type
-                string errorMessage = ex switch
-                {
-                    ArgumentException => "Invalid payment information provided. Please check your payment details and try again.",
-                    InvalidOperationException => "Payment processing is temporarily unavailable. Please try again in a few moments.",
-                    TimeoutException => "Payment request timed out. Please try again.",
-                    _ => "An unexpected error occurred while processing your payment. Please try again or contact support if the issue persists."
-                };
-                
-                var errorResponse = new ApiResponse<object>
+                _logger.LogError(ex, "Failed to create a secure payment intent for the current user.");
+                return StatusCode(502, new ApiResponse<object>
                 {
                     IsSuccessful = false,
-                    Status = "Exception",
-                    StatusReason = errorMessage,
-                    Data = null
-                };
-                
-                return StatusCode(500, errorResponse);
+                    Status = "PaymentProviderError",
+                    StatusReason = "Secure payment is temporarily unavailable. Please try again."
+                });
             }
         }
     }

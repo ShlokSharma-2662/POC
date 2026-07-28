@@ -1,6 +1,7 @@
 using Ecommerce.Application.Features.Cart.Commands;
 using Ecommerce.Application.Features.Cart.Handlers;
 using Ecommerce.Domain.Entities;
+using Ecommerce.Infrastructure.Caching;
 using Ecommerce.Infrastructure.Persistence;
 using FluentAssertions;
 using Microsoft.AspNetCore.Http;
@@ -15,6 +16,7 @@ namespace Ecommerce.Tests.Application.Features.Cart
     {
         private readonly AppDbContext _context;
         private readonly Mock<IHttpContextAccessor> _mockHttpContextAccessor;
+        private readonly Mock<ICacheInvalidationService> _mockCacheInvalidationService;
         private readonly UpdateCartCommandHandler _handler;
 
         public UpdateCartCommandHandlerTests()
@@ -25,6 +27,7 @@ namespace Ecommerce.Tests.Application.Features.Cart
 
             _context = new AppDbContext(options);
             _mockHttpContextAccessor = new Mock<IHttpContextAccessor>();
+            _mockCacheInvalidationService = new Mock<ICacheInvalidationService>();
             
             var httpContext = new DefaultHttpContext();
             var claims = new List<Claim>
@@ -35,7 +38,10 @@ namespace Ecommerce.Tests.Application.Features.Cart
             httpContext.User = new ClaimsPrincipal(identity);
             _mockHttpContextAccessor.Setup(x => x.HttpContext).Returns(httpContext);
             
-            _handler = new UpdateCartCommandHandler(_context, _mockHttpContextAccessor.Object);
+            _handler = new UpdateCartCommandHandler(
+                _context,
+                _mockHttpContextAccessor.Object,
+                _mockCacheInvalidationService.Object);
         }
 
         [Fact]
@@ -67,6 +73,9 @@ namespace Ecommerce.Tests.Application.Features.Cart
             var updatedCart = await _context.Carts.Include(c => c.Items).FirstOrDefaultAsync(c => c.UserId == "1");
             updatedCart!.Items.Should().HaveCount(1);
             updatedCart.Items.First().Quantity.Should().Be(5);
+            _mockCacheInvalidationService.Verify(
+                service => service.InvalidateCartCacheAsync(1L),
+                Times.Once);
         }
 
         [Fact]

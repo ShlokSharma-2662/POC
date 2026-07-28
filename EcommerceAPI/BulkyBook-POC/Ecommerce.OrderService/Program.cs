@@ -48,8 +48,6 @@ builder.Services.AddValidatorsFromAssembly(typeof(Ecommerce.Application.Features
 builder.Services.AddControllers()
     .AddOData(options => options.Select().Filter().OrderBy().Count().SetMaxTop(100));
 
-builder.Services.AddAuthorization();
-
 var serviceName = builder.Configuration["OpenTelemetry:ServiceName"] ?? "Ecommerce.OrderService";
 var serviceVersion = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "1.0.0";
 
@@ -63,13 +61,6 @@ builder.Services.AddOpenTelemetry()
             .AddSqlClientInstrumentation();
     });
 
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("AllowAll", policy =>
-    {
-        policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod();
-    });
-});
 builder.Services.AddScoped<Ecommerce.Application.Common.Services.IUserContextService, Ecommerce.Application.Common.Services.UserContextService>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>

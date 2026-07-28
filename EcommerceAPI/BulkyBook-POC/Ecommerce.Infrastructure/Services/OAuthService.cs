@@ -68,7 +68,7 @@ namespace Ecommerce.Infrastructure.Services
                 if (string.IsNullOrWhiteSpace(authority) || string.IsNullOrWhiteSpace(clientId))
                     throw new InvalidOperationException("OAuth configuration is incomplete.");
 
-                var tokenEndpoint = $"{authority}/oauth2/v2.0/token";
+                var tokenEndpoint = MicrosoftOAuthEndpointBuilder.BuildV2Endpoint(authority, "token");
                 
                 var parameters = new Dictionary<string, string>
                 {

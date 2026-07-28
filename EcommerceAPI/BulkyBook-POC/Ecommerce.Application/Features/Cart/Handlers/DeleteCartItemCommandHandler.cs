@@ -1,4 +1,5 @@
 using Ecommerce.Application.Features.Cart.Commands;
+using Ecommerce.Infrastructure.Caching;
 using Ecommerce.Infrastructure.Persistence;
 using MediatR;
 using Microsoft.AspNetCore.Http;
@@ -11,11 +12,16 @@ namespace Ecommerce.Application.Features.Cart.Handlers
     {
         private readonly AppDbContext _context;
         private readonly IHttpContextAccessor _httpContextAccessor;
+        private readonly ICacheInvalidationService _cacheInvalidationService;
 
-        public DeleteCartItemCommandHandler(AppDbContext context, IHttpContextAccessor httpContextAccessor)
+        public DeleteCartItemCommandHandler(
+            AppDbContext context,
+            IHttpContextAccessor httpContextAccessor,
+            ICacheInvalidationService cacheInvalidationService)
         {
             _context = context;
             _httpContextAccessor = httpContextAccessor;
+            _cacheInvalidationService = cacheInvalidationService;
         }
 
         public async Task<Unit> Handle(DeleteCartItemCommand request, CancellationToken cancellationToken)
@@ -26,13 +32,21 @@ namespace Ecommerce.Application.Features.Cart.Handlers
 
             var cart = await _context.Carts.Include(c => c.Items)
                 .FirstOrDefaultAsync(c => c.UserId == userId, cancellationToken);
-            if (cart == null) return Unit.Value;
-            var item = cart.Items.FirstOrDefault(i => i.ProductId == request.ProductId);
-            if (item != null)
+            if (cart != null)
             {
-                _context.CartItems.Remove(item);
-                await _context.SaveChangesAsync(cancellationToken);
+                var item = cart.Items.FirstOrDefault(i => i.ProductId == request.ProductId);
+                if (item != null)
+                {
+                    _context.CartItems.Remove(item);
+                    await _context.SaveChangesAsync(cancellationToken);
+                }
             }
+
+            if (long.TryParse(userId, out var numericUserId))
+            {
+                await _cacheInvalidationService.InvalidateCartCacheAsync(numericUserId);
+            }
+
             return Unit.Value;
         }
     }

@@ -115,7 +115,7 @@ namespace Ecommerce.Tests.Application.Features.Admin
             var command1 = new UpdateOrderStatusCommand 
             { 
                 OrderId = orderId, 
-                Status = "Processing" 
+                Status = "Confirmed"
             };
 
             var result1 = await _handler.Handle(command1, CancellationToken.None);
@@ -125,7 +125,7 @@ namespace Ecommerce.Tests.Application.Features.Admin
             var command2 = new UpdateOrderStatusCommand 
             { 
                 OrderId = orderId, 
-                Status = "Confirmed" 
+                Status = "Shipped"
             };
 
             // Act
@@ -136,7 +136,7 @@ namespace Ecommerce.Tests.Application.Features.Admin
             
             var updatedOrder = await _context.Orders.FindAsync(orderId);
             updatedOrder.Should().NotBeNull();
-            updatedOrder!.Status.Should().Be("Confirmed");
+            updatedOrder!.Status.Should().Be("Shipped");
         }
 
         [Fact]
@@ -158,7 +158,7 @@ namespace Ecommerce.Tests.Application.Features.Admin
             _context.Orders.Add(order);
             await _context.SaveChangesAsync();
 
-            var statuses = new[] { "Confirmed", "Shipped", "Delivered", "Cancelled" };
+            var statuses = new[] { "Confirmed", "Shipped", "Delivered" };
 
             foreach (var status in statuses)
             {

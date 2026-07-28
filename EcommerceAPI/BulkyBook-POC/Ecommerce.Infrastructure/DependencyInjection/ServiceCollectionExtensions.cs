@@ -2,6 +2,7 @@ using AspNetCoreRateLimit;
 using Ecommerce.Domain.Interfaces;
 using Ecommerce.Infrastructure.Caching;
 using Ecommerce.Infrastructure.Messaging.Consumers;
+using Ecommerce.Infrastructure.Payments;
 using Ecommerce.Infrastructure.Persistence;
 using Ecommerce.Infrastructure.Services;
 using MassTransit;
@@ -27,6 +28,8 @@ public static class ServiceCollectionExtensions
 
         // Infrastructure Services
         services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
+        services.AddScoped<IPaymentGateway, StripePaymentGateway>();
+        services.AddScoped<ISecureCheckoutPaymentService, SecureCheckoutPaymentService>();
         
         // Resilience Policy Service
         services.AddSingleton<IResiliencePolicyService, ResiliencePolicyService>();
@@ -320,20 +323,78 @@ public static class ServiceCollectionExtensions
         return services;
     }
 
-    public static IServiceCollection AddCorsServices(this IServiceCollection services)
+    public static IServiceCollection AddCorsServices(
+        this IServiceCollection services,
+        IConfiguration configuration)
     {
+        var configuredOrigins = new List<string>();
+        AddOrigins(configuredOrigins, configuration["Cors:AllowedOrigins"]);
+        AddOrigins(configuredOrigins, configuration["Frontend:BaseUrl"]);
+
+        var allowedOriginsSection = configuration.GetSection("Cors:AllowedOrigins");
+        foreach (var child in allowedOriginsSection.GetChildren())
+        {
+            AddOrigins(configuredOrigins, child.Value);
+        }
+
+        // Keep both localhost variants available for the existing Angular app and
+        // the parallel React migration unless a deployment explicitly adds more.
+        configuredOrigins.Add("http://localhost:4200");
+        configuredOrigins.Add("https://localhost:4200");
+
+        var allowedOrigins = configuredOrigins
+            .Select(NormalizeOrigin)
+            .Where(origin => origin is not null)
+            .Cast<string>()
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
         services.AddCors(options =>
         {
             options.AddPolicy("AllowAll", policy =>
             {
-                policy.WithOrigins("http://localhost:4200", "https://localhost:4200")
+                policy.WithOrigins(allowedOrigins)
                       .AllowAnyHeader()
                       .AllowAnyMethod()
-                      .AllowCredentials();
+                      .AllowCredentials()
+                      .WithExposedHeaders(
+                          "Retry-After",
+                          "X-RateLimit-Limit",
+                          "X-RateLimit-Remaining",
+                          "X-RateLimit-Reset",
+                          "X-RateLimit-Reset-At");
             });
         });
 
         return services;
+    }
+
+    private static void AddOrigins(ICollection<string> origins, string? configuredOrigins)
+    {
+        if (string.IsNullOrWhiteSpace(configuredOrigins))
+        {
+            return;
+        }
+
+        foreach (var origin in configuredOrigins.Split(
+                     ',',
+                     StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
+        {
+            origins.Add(origin);
+        }
+    }
+
+    private static string? NormalizeOrigin(string origin)
+    {
+        if (!Uri.TryCreate(origin, UriKind.Absolute, out var uri) ||
+            !string.IsNullOrEmpty(uri.UserInfo) ||
+            !string.Equals(uri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        return uri.GetLeftPart(UriPartial.Authority).TrimEnd('/');
     }
 
 
@@ -462,7 +523,7 @@ public static class ServiceCollectionExtensions
             .AddApplicationServices()
             .AddApiServices()
             .AddAuthenticationServices(configuration)
-            .AddCorsServices()
+            .AddCorsServices(configuration)
             .AddRateLimitingServices(configuration)
             .AddLoggingServices(configuration)
             .AddThirdPartyServices(configuration);

@@ -4,11 +4,13 @@ using Azure.Identity;
 using Ecommerce.API.GraphQL;
 using Ecommerce.API.GrpcServices;
 using Ecommerce.API.Middleware;
+using Ecommerce.API.Security;
 using Ecommerce.Infrastructure.DependencyInjection;
 using Ecommerce.Infrastructure.Persistence;
 using FluentValidation;
 using FluentValidation.AspNetCore;
 using MediatR;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc.Versioning;
 using Microsoft.AspNetCore.OData;
 using Microsoft.EntityFrameworkCore;
@@ -49,6 +51,8 @@ if (keyVaultEnabled && !string.IsNullOrEmpty(keyVaultName))
 }
 
 builder.Services.AddEcommerceServices(builder.Configuration);
+builder.Services.AddSingleton<IOAuthAuthorizationCodeStore, OAuthAuthorizationCodeStore>();
+builder.Services.AddScoped<IExternalOAuthUserService, ExternalOAuthUserService>();
 builder.Services.AddMediatR(Assembly.Load("Ecommerce.Application"));
 
 // gRPC
@@ -69,18 +73,22 @@ builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
     options.SerializerOptions.DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull;
 });
-// ✅ Allow all CORS (for dev/testing)
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("AllowAll", policy =>
-    {
-        policy
-            .AllowAnyOrigin()   // Allows any frontend domain
-            .AllowAnyHeader()   // Allows all headers (Auth, Content-Type, etc.)
-            .AllowAnyMethod();  // Allows all HTTP methods (GET, POST, PUT, DELETE, etc.)
-    });
-});
 builder.Services.AddScoped<Ecommerce.Application.Common.Services.IUserContextService, Ecommerce.Application.Common.Services.UserContextService>();
+
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders =
+        ForwardedHeaders.XForwardedFor |
+        ForwardedHeaders.XForwardedHost |
+        ForwardedHeaders.XForwardedProto;
+    options.ForwardLimit = 1;
+
+    if (builder.Configuration.GetValue<bool>("ReverseProxy:TrustForwardedHeaders"))
+    {
+        options.KnownNetworks.Clear();
+        options.KnownProxies.Clear();
+    }
+});
 
 // OData
 builder.Services.AddControllers()
@@ -178,6 +186,7 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
+app.UseForwardedHeaders();
 app.UseSerilogRequestLogging();
 app.UseHttpsRedirection();
 app.UseStaticFiles();

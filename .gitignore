@@ -2,6 +2,9 @@
 .dotnet-home/
 .runner-temp/
 .sonarqube/
+.env
+.env.local
+.env.*.local
 
 # Build logs
 build-diag.log

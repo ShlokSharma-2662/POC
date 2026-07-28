@@ -70,7 +70,7 @@ builder.Services.AddInfrastructureServices(configuration);
 builder.Services.AddAuthenticationServices(configuration);
 
 // Register only CORS services
-builder.Services.AddCorsServices();
+builder.Services.AddCorsServices(configuration);
 ```
 
 ## Benefits

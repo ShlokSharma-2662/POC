@@ -270,6 +270,20 @@ namespace Ecommerce.Tests.Controllers
         }
 
         [Fact]
+        public void LogMetric_ExposesLegacyAndMetricsRoutes()
+        {
+            var method = typeof(AdminController).GetMethod(nameof(AdminController.LogMetric));
+
+            var routeTemplates = method!
+                .GetCustomAttributes(typeof(HttpPostAttribute), inherit: false)
+                .Cast<HttpPostAttribute>()
+                .Select(attribute => attribute.Template);
+
+            routeTemplates.Should().Contain("log");
+            routeTemplates.Should().Contain("metrics/log");
+        }
+
+        [Fact]
         public async Task LogMetric_WithNullCommand_ReturnsValidationErrorResponse()
         {
             // Arrange

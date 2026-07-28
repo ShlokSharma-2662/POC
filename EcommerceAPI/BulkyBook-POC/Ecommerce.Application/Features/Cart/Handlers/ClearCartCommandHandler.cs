@@ -1,4 +1,5 @@
 using Ecommerce.Application.Features.Cart.Commands;
+using Ecommerce.Infrastructure.Caching;
 using Ecommerce.Infrastructure.Persistence;
 using MediatR;
 using Microsoft.AspNetCore.Http;
@@ -11,11 +12,16 @@ namespace Ecommerce.Application.Features.Cart.Handlers
     {
         private readonly AppDbContext _context;
         private readonly IHttpContextAccessor _httpContextAccessor;
+        private readonly ICacheInvalidationService _cacheInvalidationService;
 
-        public ClearCartCommandHandler(AppDbContext context, IHttpContextAccessor httpContextAccessor)
+        public ClearCartCommandHandler(
+            AppDbContext context,
+            IHttpContextAccessor httpContextAccessor,
+            ICacheInvalidationService cacheInvalidationService)
         {
             _context = context;
             _httpContextAccessor = httpContextAccessor;
+            _cacheInvalidationService = cacheInvalidationService;
         }
 
         public async Task<Unit> Handle(ClearCartCommand request, CancellationToken cancellationToken)
@@ -31,6 +37,12 @@ namespace Ecommerce.Application.Features.Cart.Handlers
                 _context.CartItems.RemoveRange(cart.Items);
                 await _context.SaveChangesAsync(cancellationToken);
             }
+
+            if (long.TryParse(userId, out var numericUserId))
+            {
+                await _cacheInvalidationService.InvalidateCartCacheAsync(numericUserId);
+            }
+
             return Unit.Value;
         }
     }

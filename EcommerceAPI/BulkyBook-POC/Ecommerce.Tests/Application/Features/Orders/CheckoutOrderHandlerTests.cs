@@ -182,7 +182,7 @@ namespace Ecommerce.Tests.Application.Features.Orders
             var exception = await Assert.ThrowsAsync<InvalidOperationException>(
                 () => _handler.Handle(command, CancellationToken.None));
             
-            exception.Message.Should().Contain("Product with ID 999 not found");
+            exception.Message.Should().Contain("Product with ID 999 is unavailable");
         }
 
         [Fact]
@@ -525,7 +525,7 @@ namespace Ecommerce.Tests.Application.Features.Orders
             // Assert
             var order = await _context.Orders.FirstOrDefaultAsync(o => o.Id == result);
             order.Should().NotBeNull();
-            order!.CreatedAt.Should().BeCloseTo(DateTime.Now, TimeSpan.FromMinutes(1));
+            order!.CreatedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromMinutes(1));
         }
 
         [Fact]

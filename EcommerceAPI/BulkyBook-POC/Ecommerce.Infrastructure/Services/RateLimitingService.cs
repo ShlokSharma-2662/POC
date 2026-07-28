@@ -157,9 +157,14 @@ namespace Ecommerce.Infrastructure.Services
                 {
                     entry.AbsoluteExpirationRelativeToNow = window;
                     return new RateLimitCounter { Count = 0, ResetTime = DateTime.UtcNow.Add(window) };
-                });
+                })!;
 
-                var resetTime = DateTime.UtcNow.Add(window);
+                var now = DateTime.UtcNow;
+                if (current.ResetTime <= now)
+                {
+                    current.Count = 0;
+                    current.ResetTime = now.Add(window);
+                }
 
                 if (current.Count >= limit)
                 {
@@ -169,13 +174,12 @@ namespace Ecommerce.Infrastructure.Services
                         IsAllowed = false,
                         Limit = limit,
                         Remaining = 0,
-                        ResetTime = resetTime
+                        ResetTime = current.ResetTime
                     };
                 }
 
                 current.Count++;
-                current.ResetTime = resetTime;
-                _cache.Set(cacheKey, current, window);
+                _cache.Set(cacheKey, current, new DateTimeOffset(current.ResetTime));
 
                 var remaining = Math.Max(0, limit - current.Count);
 
@@ -186,7 +190,7 @@ namespace Ecommerce.Infrastructure.Services
                     IsAllowed = true,
                     Limit = limit,
                     Remaining = remaining,
-                    ResetTime = resetTime
+                    ResetTime = current.ResetTime
                 };
             }
             finally

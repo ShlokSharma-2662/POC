@@ -1,12 +1,10 @@
 using Ecommerce.Application.Common.Models;
+using Ecommerce.API.Security;
 using Ecommerce.Infrastructure.Services;
-using Ecommerce.Infrastructure.Persistence;
-using Ecommerce.Domain.Entities;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
-using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 using Ecommerce.Domain.Interfaces;
 
@@ -20,32 +18,35 @@ namespace Ecommerce.API.Controllers
         private readonly IConfiguration _configuration;
         private readonly ILogger<GoogleOAuthController> _logger;
         private readonly IJwtTokenGenerator _jwtTokenGenerator;
-        private readonly AppDbContext _context;
+        private readonly IExternalOAuthUserService _externalUserService;
+        private readonly IOAuthAuthorizationCodeStore _authorizationCodeStore;
 
         public GoogleOAuthController(
             IGoogleOAuthService googleOAuthService,
             IConfiguration configuration,
             ILogger<GoogleOAuthController> logger,
             IJwtTokenGenerator jwtTokenGenerator,
-            AppDbContext context)
+            IExternalOAuthUserService externalUserService,
+            IOAuthAuthorizationCodeStore authorizationCodeStore)
         {
             _googleOAuthService = googleOAuthService;
             _configuration = configuration;
             _logger = logger;
             _jwtTokenGenerator = jwtTokenGenerator;
-            _context = context;
+            _externalUserService = externalUserService;
+            _authorizationCodeStore = authorizationCodeStore;
         }
 
         [HttpGet("login")]
-        public IActionResult Login([FromQuery] string? returnUrl = null)
+        public IActionResult Login(
+            [FromQuery] string? returnUrl = null,
+            [FromQuery] string? returnTo = null)
         {
             try
             {
                 var clientId = _configuration["GoogleOAuth:ClientId"];
                 var scope = _configuration["GoogleOAuth:Scope"] ?? "openid profile email";
-                var callbackPath = _configuration["GoogleOAuth:CallbackPath"] ?? "/api/google-oauth/callback";
                 var responseType = _configuration["GoogleOAuth:ResponseType"] ?? "code";
-                var baseUrl = _configuration["GoogleOAuth:BaseUrl"];
 
                 if (string.IsNullOrWhiteSpace(clientId))
                 {
@@ -53,25 +54,38 @@ namespace Ecommerce.API.Controllers
                     return BadRequest(new { error = "Google OAuth is not properly configured" });
                 }
 
-                // Use configured BaseUrl if available, otherwise construct from request
-                // IMPORTANT: Google OAuth requires exact match - no query parameters in redirect URI
-                string redirectUri;
-                if (!string.IsNullOrWhiteSpace(baseUrl))
+                if (!OAuthRedirectUrlHelper.TryResolveFrontendReturnUrl(
+                        _configuration,
+                        returnUrl,
+                        out var safeReturnUrl))
                 {
-                    redirectUri = $"{baseUrl.TrimEnd('/')}{callbackPath}";
+                    _logger.LogWarning("Rejected untrusted Google OAuth return URL");
+                    return ValidationErrorResponse("The return URL is not allowed.");
                 }
-                else
+
+                if (!OAuthRedirectUrlHelper.TryResolveFrontendReturnPath(
+                        returnTo,
+                        out var safeReturnTo))
                 {
-                    redirectUri = $"{Request.Scheme}://{Request.Host}{callbackPath}";
+                    _logger.LogWarning("Rejected untrusted Google OAuth return destination");
+                    return ValidationErrorResponse("The return destination is not allowed.");
                 }
+
+                // Google requires an exact callback URI with no per-request query parameters.
+                var redirectUri = OAuthRedirectUrlHelper.BuildCallbackUri(
+                    Request,
+                    _configuration,
+                    "GoogleOAuth",
+                    "/api/google-oauth/callback");
                 
                 // Store returnUrl and redirectUri in session to ensure exact match during callback
                 // Google OAuth doesn't allow query parameters in redirect URI
-                if (!string.IsNullOrEmpty(returnUrl))
-                {
-                    HttpContext.Session.SetString("google_oauth_return_url", returnUrl);
-                }
+                HttpContext.Session.SetString("google_oauth_return_url", safeReturnUrl);
                 HttpContext.Session.SetString("google_oauth_redirect_uri", redirectUri);
+                if (safeReturnTo is not null)
+                {
+                    HttpContext.Session.SetString("google_oauth_return_to", safeReturnTo);
+                }
 
                 var state = Guid.NewGuid().ToString();
                 HttpContext.Session.SetString("google_oauth_state", state);
@@ -123,23 +137,20 @@ namespace Ecommerce.API.Controllers
                     return BadRequest(new { error = "Invalid state parameter" });
                 }
 
+                HttpContext.Session.Remove("google_oauth_state");
+
                 // Get redirectUri from session to ensure exact match with what was sent to Google
                 var redirectUri = HttpContext.Session.GetString("google_oauth_redirect_uri");
+                HttpContext.Session.Remove("google_oauth_redirect_uri");
                 
                 if (string.IsNullOrEmpty(redirectUri))
                 {
                     // Fallback to constructing it if not in session (shouldn't happen normally)
-                    var callbackPath = _configuration["GoogleOAuth:CallbackPath"] ?? "/api/google-oauth/callback";
-                    var baseUrl = _configuration["GoogleOAuth:BaseUrl"];
-                    
-                    if (!string.IsNullOrWhiteSpace(baseUrl))
-                    {
-                        redirectUri = $"{baseUrl.TrimEnd('/')}{callbackPath}";
-                    }
-                    else
-                    {
-                        redirectUri = $"{Request.Scheme}://{Request.Host}{callbackPath}";
-                    }
+                    redirectUri = OAuthRedirectUrlHelper.BuildCallbackUri(
+                        Request,
+                        _configuration,
+                        "GoogleOAuth",
+                        "/api/google-oauth/callback");
                     _logger.LogWarning("RedirectUri not found in session, constructed: {RedirectUri}", redirectUri);
                 }
                 else
@@ -147,10 +158,20 @@ namespace Ecommerce.API.Controllers
                     _logger.LogInformation("Using redirectUri from session: {RedirectUri}", redirectUri);
                 }
                 
-                // Get returnUrl from session if not in query string
-                if (string.IsNullOrEmpty(returnUrl))
+                // Prefer the session value established during login. A callback query value is
+                // accepted only for compatibility and is still validated below.
+                var storedReturnUrl = HttpContext.Session.GetString("google_oauth_return_url");
+                HttpContext.Session.Remove("google_oauth_return_url");
+                var safeReturnTo = HttpContext.Session.GetString("google_oauth_return_to");
+                HttpContext.Session.Remove("google_oauth_return_to");
+                var requestedReturnUrl = storedReturnUrl ?? returnUrl;
+                if (!OAuthRedirectUrlHelper.TryResolveFrontendReturnUrl(
+                        _configuration,
+                        requestedReturnUrl,
+                        out var safeReturnUrl))
                 {
-                    returnUrl = HttpContext.Session.GetString("google_oauth_return_url");
+                    _logger.LogWarning("Rejected untrusted Google OAuth callback return URL");
+                    return ValidationErrorResponse("The return URL is not allowed.");
                 }
 
                 _logger.LogInformation("Exchanging authorization code for token. RedirectUri: {RedirectUri}", redirectUri);
@@ -173,40 +194,10 @@ namespace Ecommerce.API.Controllers
 
                 _logger.LogInformation("Successfully retrieved user info for email: {Email}", userInfo.Email);
 
-                // Check if user exists in database, if not create them
-                var dbUser = await _context.Users.FirstOrDefaultAsync(u => u.Email == userInfo.Email);
-                
-                if (dbUser == null)
-                {
-                    // Create new user for OAuth login
-                    _logger.LogInformation("Creating new user in database for OAuth email: {Email}", userInfo.Email);
-                    dbUser = new ApplicationUser
-                    {
-                        Email = userInfo.Email,
-                        FirstName = userInfo.GivenName ?? string.Empty,
-                        LastName = userInfo.FamilyName ?? string.Empty,
-                        Username = userInfo.Email, // Use email as username
-                        PasswordHash = BCrypt.Net.BCrypt.HashPassword(Guid.NewGuid().ToString()), // Random password for OAuth users
-                        Role = "User",
-                        Status = "Active"
-                    };
-
-                    _context.Users.Add(dbUser);
-                    await _context.SaveChangesAsync();
-                    _logger.LogInformation("User created successfully with ID: {UserId}", dbUser.Id);
-                }
-                else
-                {
-                    // Update user info if needed (in case name changed in Google)
-                    if (dbUser.FirstName != userInfo.GivenName || dbUser.LastName != userInfo.FamilyName)
-                    {
-                        dbUser.FirstName = userInfo.GivenName ?? dbUser.FirstName;
-                        dbUser.LastName = userInfo.FamilyName ?? dbUser.LastName;
-                        dbUser.UpdatedAt = DateTime.UtcNow;
-                        await _context.SaveChangesAsync();
-                        _logger.LogInformation("User info updated for ID: {UserId}", dbUser.Id);
-                    }
-                }
+                var dbUser = await _externalUserService.UpsertAsync(
+                    "google",
+                    userInfo,
+                    HttpContext.RequestAborted);
 
                 var claims = new List<Claim>
                 {
@@ -215,6 +206,7 @@ namespace Ecommerce.API.Controllers
                     new(ClaimTypes.Name, userInfo.Name ?? string.Empty),
                     new(ClaimTypes.GivenName, userInfo.GivenName ?? string.Empty),
                     new(ClaimTypes.Surname, userInfo.FamilyName ?? string.Empty),
+                    new("external_subject", userInfo.Subject),
                     new("picture", userInfo.Picture ?? string.Empty),
                     new("access_token", tokenResult.AccessToken),
                     new("id_token", tokenResult.IdToken ?? string.Empty)
@@ -235,35 +227,27 @@ namespace Ecommerce.API.Controllers
 
                 _logger.LogInformation("Successfully authenticated user via Google OAuth: {Email}", userInfo.Email);
 
-                // Determine redirect URL - default to frontend OAuth callback
-                string redirectUrl;
-                if (!string.IsNullOrEmpty(returnUrl))
-                {
-                    // If returnUrl is a relative path, assume it's a frontend route
-                    if (!returnUrl.StartsWith("http://") && !returnUrl.StartsWith("https://"))
-                    {
-                        // Get frontend URL from configuration or default to localhost:4200
-                        var frontendUrl = _configuration["Frontend:BaseUrl"] ?? "https://localhost:4200";
-                        redirectUrl = $"{frontendUrl.TrimEnd('/')}{returnUrl}";
-                        _logger.LogInformation("Converted relative returnUrl to full URL: {RedirectUrl}", redirectUrl);
-                    }
-                    else
-                    {
-                        redirectUrl = returnUrl;
-                    }
-                }
-                else
-                {
-                    // Default to frontend OAuth callback
-                    var frontendUrl = _configuration["Frontend:BaseUrl"] ?? "https://localhost:4200";
-                    redirectUrl = $"{frontendUrl}/oauth/callback";
-                }
+                var authorizationCode = await _authorizationCodeStore.IssueAsync(
+                    "google",
+                    new OAuthAuthorizationGrant(
+                        jwtToken,
+                        dbUser.Id,
+                        dbUser.FirstName,
+                        dbUser.LastName,
+                        dbUser.Email,
+                        dbUser.Role,
+                        userInfo.Picture,
+                        safeReturnTo,
+                        default),
+                    HttpContext.RequestAborted);
+                var redirectUrl = OAuthRedirectUrlHelper.AppendAuthorizationCode(
+                    safeReturnUrl,
+                    authorizationCode,
+                    "google");
+                Response.Headers.CacheControl = "no-store";
+                Response.Headers["Referrer-Policy"] = "no-referrer";
                 
-                // Add JWT token as query parameter for frontend to extract
-                var separator = redirectUrl.Contains("?") ? "&" : "?";
-                redirectUrl += $"{separator}jwt_token={Uri.EscapeDataString(jwtToken)}";
-                
-                _logger.LogInformation("Redirecting to: {RedirectUrl}", redirectUrl);
+                _logger.LogInformation("Redirecting to the configured frontend OAuth callback");
                 return Redirect(redirectUrl);
             }
             catch (OAuthException oauthEx)
@@ -306,6 +290,36 @@ namespace Ecommerce.API.Controllers
             }
         }
 
+        [HttpPost("exchange")]
+        [AllowAnonymous]
+        [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+        public async Task<ActionResult<OAuthCodeExchangeResponse>> Exchange(
+            [FromBody] OAuthCodeExchangeRequest? request,
+            CancellationToken cancellationToken)
+        {
+            if (string.IsNullOrWhiteSpace(request?.Code))
+            {
+                return ValidationErrorResponse<OAuthCodeExchangeResponse>(
+                    "The OAuth authorization code is required.");
+            }
+
+            var grant = await _authorizationCodeStore.ConsumeAsync(
+                "google",
+                request.Code,
+                cancellationToken);
+            if (grant is null)
+            {
+                return ValidationErrorResponse<OAuthCodeExchangeResponse>(
+                    "The OAuth authorization code is invalid, expired, or has already been used.");
+            }
+
+            Response.Headers.CacheControl = "no-store";
+            return Ok(ApiResponse<OAuthCodeExchangeResponse>.Success(
+                ToExchangeResponse(grant),
+                "Success",
+                "OAuth authentication completed successfully"));
+        }
+
         [HttpPost("logout")]
         [Authorize]
         public async Task<IActionResult> Logout()
@@ -318,7 +332,10 @@ namespace Ecommerce.API.Controllers
 
                 _logger.LogInformation("User logged out successfully from Google OAuth");
 
-                return Ok(new { logoutUrl });
+                return Ok(ApiResponse<OAuthLogoutResponse>.Success(
+                    new OAuthLogoutResponse(logoutUrl),
+                    "Success",
+                    "Logged out successfully"));
             }
             catch (Exception ex)
             {
@@ -353,6 +370,19 @@ namespace Ecommerce.API.Controllers
                 return HandleException(ex, "Unable to retrieve user information. Please try again or contact support if the issue persists.");
             }
         }
+
+        private static OAuthCodeExchangeResponse ToExchangeResponse(
+            OAuthAuthorizationGrant grant) =>
+            new(
+                grant.Token,
+                grant.UserId,
+                grant.FirstName,
+                grant.LastName,
+                grant.Email,
+                grant.Role,
+                $"{grant.FirstName} {grant.LastName}".Trim(),
+                grant.Picture,
+                grant.ReturnTo);
     }
 }
 

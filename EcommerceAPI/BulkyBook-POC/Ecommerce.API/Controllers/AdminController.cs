@@ -100,6 +100,7 @@ namespace Ecommerce.API.Controllers
         }
 
         [HttpPost("log")]
+        [HttpPost("metrics/log")]
         public async Task<IActionResult> LogMetric([FromBody] LogMetricCommand command)
         {
             try
