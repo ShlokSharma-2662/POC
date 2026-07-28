@@ -147,6 +147,21 @@ namespace Ecommerce.Infrastructure.Caching
             }
         }
 
+        public async Task InvalidateCartCacheAsync(long userId)
+        {
+            if (_isCacheEnabled != "true")
+                return;
+
+            try
+            {
+                await _cacheService.RemoveAsync(CacheKeyBuilder.UserCart(userId));
+            }
+            catch (Exception)
+            {
+                // Cache invalidation failure should not affect application functionality
+            }
+        }
+
         public async Task InvalidateWishlistCacheAsync(long userId)
         {
             if (_isCacheEnabled != "true")

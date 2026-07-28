@@ -71,13 +71,6 @@ builder.Services.AddOpenTelemetry()
             .AddSqlClientInstrumentation();
     });
 
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("AllowAll", policy =>
-    {
-        policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod();
-    });
-});
 builder.Services.AddScoped<Ecommerce.Application.Common.Services.IUserContextService, Ecommerce.Application.Common.Services.UserContextService>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>

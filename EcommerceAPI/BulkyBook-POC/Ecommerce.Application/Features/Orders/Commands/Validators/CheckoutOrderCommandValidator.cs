@@ -19,6 +19,11 @@ namespace Ecommerce.Application.Features.Orders.Commands
                 .Matches(@"^\+?[\d\s\-\(\)]{7,20}$")
                 .WithMessage("Phone number format is invalid");
 
+            RuleFor(x => x.PaymentIntentId)
+                .NotEmpty().WithMessage("A completed payment is required")
+                .Matches(@"^pi_[A-Za-z0-9_]+$")
+                .WithMessage("A valid PaymentIntent ID is required");
+
             RuleFor(x => x.Items)
                 .NotEmpty().WithMessage("Order must contain at least one item")
                 .Must(items => items.All(i => i.Quantity > 0))

@@ -7,6 +7,7 @@ using MediatR;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using System.Data;
 using System.Security.Claims;
 using static Ecommerce.Application.Features.Orders.Commands.CheckoutOrderCommand;
 
@@ -32,12 +33,82 @@ namespace Ecommerce.Application.Features.Orders.Handlers
         public async Task<Guid> Handle(CheckoutOrderCommand request, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            
-            var userId = _httpContextAccessor.HttpContext?.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            
-            if (string.IsNullOrEmpty(userId))
+
+            var userIdValue = _httpContextAccessor.HttpContext?.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (!long.TryParse(userIdValue, out var userId))
             {
                 throw new UnauthorizedAccessException("User ID not found in claims. Please ensure you are authenticated.");
+            }
+
+            var secureCheckout = !string.IsNullOrWhiteSpace(request.PaymentIntentId);
+            if (secureCheckout &&
+                (string.IsNullOrWhiteSpace(request.VerifiedCartFingerprint) ||
+                 request.VerifiedTotalAmount <= 0 ||
+                 string.IsNullOrWhiteSpace(request.VerifiedCurrency)))
+            {
+                throw new UnauthorizedAccessException(
+                    "The checkout payment was not verified by the server.");
+            }
+
+            var normalizedItems = request.Items
+                .GroupBy(item => item.ProductId)
+                .Select(group => new OrderItemDto
+                {
+                    ProductId = group.Key,
+                    Quantity = checked(group.Sum(item => item.Quantity))
+                })
+                .OrderBy(item => item.ProductId)
+                .ToList();
+
+            await using var transaction = _context.Database.IsRelational()
+                ? await _context.Database.BeginTransactionAsync(
+                    IsolationLevel.Serializable,
+                    cancellationToken)
+                : null;
+
+            if (secureCheckout)
+            {
+                var existingOrderId = await _context.Orders
+                    .Where(order => order.PaymentIntentId == request.PaymentIntentId)
+                    .Select(order => (Guid?)order.Id)
+                    .SingleOrDefaultAsync(cancellationToken);
+
+                if (existingOrderId.HasValue)
+                {
+                    return existingOrderId.Value;
+                }
+            }
+
+            var productIds = normalizedItems.Select(item => item.ProductId).ToList();
+            var products = await _context.Products
+                .Where(product =>
+                    productIds.Contains(product.ProductId) &&
+                    product.IsActive &&
+                    !product.IsDeleted)
+                .ToDictionaryAsync(product => product.ProductId, cancellationToken);
+
+            decimal serverTotal = 0;
+            foreach (var item in normalizedItems)
+            {
+                if (!products.TryGetValue(item.ProductId, out var product))
+                {
+                    throw new InvalidOperationException(
+                        $"Product with ID {item.ProductId} is unavailable. Please refresh the page and try again.");
+                }
+
+                if (product.Stock < item.Quantity)
+                {
+                    throw new InvalidOperationException(
+                        $"Insufficient stock for {product.Name}. Available: {product.Stock}, Requested: {item.Quantity}. Please adjust your order and try again.");
+                }
+
+                serverTotal = checked(serverTotal + product.Price * item.Quantity);
+            }
+
+            if (secureCheckout && serverTotal != request.VerifiedTotalAmount)
+            {
+                throw new InvalidOperationException(
+                    "Product prices changed after payment authorization; the payment must be refunded.");
             }
 
             var order = new Order
@@ -46,44 +117,49 @@ namespace Ecommerce.Application.Features.Orders.Handlers
                 CustomerName = request.FullName,
                 ShippingAddress = request.Address,
                 Phone = request.PhoneNumber,
-                UserId = Convert.ToInt64(userId),
-                CreatedAt = DateTime.Now,
-                Items = request.Items.Select(i => new OrderItem
+                UserId = userId,
+                CreatedAt = DateTime.UtcNow,
+                PaymentIntentId = secureCheckout ? request.PaymentIntentId : null,
+                CartFingerprint = request.VerifiedCartFingerprint,
+                TotalAmount = serverTotal,
+                Currency = secureCheckout ? request.VerifiedCurrency : "usd",
+                Items = normalizedItems.Select(i => new OrderItem
                 {
                     ProductId = i.ProductId,
                     Quantity = i.Quantity
                 }).ToList()
             };
+
+            foreach (var item in normalizedItems)
+            {
+                products[item.ProductId].Stock -= item.Quantity;
+            }
+
             _context.Orders.Add(order);
             await _context.SaveChangesAsync(cancellationToken);
 
-            foreach (var item in request.Items)
+            if (transaction != null)
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                
-                var product = await _context.Products.FirstOrDefaultAsync(p => p.ProductId == item.ProductId, cancellationToken);
-                if (product == null)
-                    throw new InvalidOperationException($"Product with ID {item.ProductId} not found. Please refresh the page and try again.");
-
-                if (product.Stock < item.Quantity)
-                    throw new InvalidOperationException($"Insufficient stock for {product.Name}. Available: {product.Stock}, Requested: {item.Quantity}. Please adjust your order and try again.");
-
-                product.Stock -= item.Quantity; // ✅ Decrease stock
-
-                // Save immediately after decrementing stock to persist the change
-                _context.Products.Update(product);
-
-                // Invalidate product caches so storefront reflects updated stock immediately
-                await _cacheInvalidationService.InvalidateProductCacheAsync(product.ProductId);
+                await transaction.CommitAsync(cancellationToken);
             }
 
-            await _context.SaveChangesAsync(cancellationToken);
-
-            // Send order confirmation email
             await SendOrderConfirmationEmailAsync(order, request, cancellationToken);
 
-            // Invalidate order cache after successful order creation
-            await _cacheInvalidationService.InvalidateAllOrdersCacheAsync();
+            try
+            {
+                foreach (var item in normalizedItems)
+                {
+                    await _cacheInvalidationService.InvalidateProductCacheAsync(item.ProductId);
+                }
+                await _cacheInvalidationService.InvalidateAllOrdersCacheAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(
+                    ex,
+                    "Order {OrderId} committed, but cache invalidation failed.",
+                    order.Id);
+            }
 
             return order.Id;
         }

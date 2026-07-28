@@ -36,6 +36,27 @@ namespace Ecommerce.Infrastructure.Persistence
                 .WithOne(i => i.Order)
                 .HasForeignKey(i => i.OrderId);
 
+            modelBuilder.Entity<Order>()
+                .HasIndex(order => order.PaymentIntentId)
+                .IsUnique()
+                .HasFilter("[PaymentIntentId] IS NOT NULL");
+
+            modelBuilder.Entity<Order>()
+                .Property(order => order.PaymentIntentId)
+                .HasMaxLength(255);
+
+            modelBuilder.Entity<Order>()
+                .Property(order => order.CartFingerprint)
+                .HasMaxLength(64);
+
+            modelBuilder.Entity<Order>()
+                .Property(order => order.Currency)
+                .HasMaxLength(3);
+
+            modelBuilder.Entity<Order>()
+                .Property(order => order.TotalAmount)
+                .HasPrecision(18, 2);
+
             modelBuilder.Entity<Cart>()
                 .ToTable("Cart")
                 .HasKey(c => c.CartId);

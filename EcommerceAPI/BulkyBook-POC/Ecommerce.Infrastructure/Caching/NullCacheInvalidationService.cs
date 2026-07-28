@@ -37,6 +37,11 @@ namespace Ecommerce.Infrastructure.Caching
             return Task.CompletedTask;
         }
 
+        public Task InvalidateCartCacheAsync(long userId)
+        {
+            return Task.CompletedTask;
+        }
+
         public Task InvalidateWishlistCacheAsync(long userId)
         {
             return Task.CompletedTask;

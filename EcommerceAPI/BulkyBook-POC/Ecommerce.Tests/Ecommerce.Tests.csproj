@@ -14,9 +14,6 @@
     <PackageReference Include="Microsoft.AspNetCore.TestHost" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" />
     <PackageReference Include="FluentAssertions" />
-    <PackageReference Include="AutoFixture" />
-    <PackageReference Include="AutoFixture.Xunit2" />
-    <PackageReference Include="AutoFixture.AutoMoq" />
   </ItemGroup>
 
   <ItemGroup>

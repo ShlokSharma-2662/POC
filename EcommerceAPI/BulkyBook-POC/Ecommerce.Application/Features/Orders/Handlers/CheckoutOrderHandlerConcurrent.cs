@@ -17,7 +17,7 @@ namespace Ecommerce.Application.Features.Orders.Handlers
     /// <summary>
     /// Production-ready CheckoutOrderHandler with comprehensive race condition prevention
     /// </summary>
-    public class CheckoutOrderHandlerConcurrent : IRequestHandler<CheckoutOrderCommand, Guid>
+    public class CheckoutOrderHandlerConcurrent
     {
         private readonly AppDbContext _context;
         private readonly IHttpContextAccessor _httpContextAccessor;

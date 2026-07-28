@@ -1,4 +1,5 @@
 using Ecommerce.Application.Common.Models;
+using Ecommerce.API.Security;
 using Ecommerce.Infrastructure.Services;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
@@ -17,36 +18,71 @@ namespace Ecommerce.API.Controllers
         private readonly IConfiguration _configuration;
         private readonly ILogger<OAuthController> _logger;
         private readonly IJwtTokenGenerator _jwtTokenGenerator;
+        private readonly IExternalOAuthUserService _externalUserService;
+        private readonly IOAuthAuthorizationCodeStore _authorizationCodeStore;
 
-        public OAuthController(IOAuthService oauthService, IConfiguration configuration, ILogger<OAuthController> logger, IJwtTokenGenerator jwtTokenGenerator)
+        public OAuthController(
+            IOAuthService oauthService,
+            IConfiguration configuration,
+            ILogger<OAuthController> logger,
+            IJwtTokenGenerator jwtTokenGenerator,
+            IExternalOAuthUserService externalUserService,
+            IOAuthAuthorizationCodeStore authorizationCodeStore)
         {
             _oauthService = oauthService;
             _configuration = configuration;
             _logger = logger;
             _jwtTokenGenerator = jwtTokenGenerator;
+            _externalUserService = externalUserService;
+            _authorizationCodeStore = authorizationCodeStore;
         }
 
         [HttpGet("login")]
-        public IActionResult Login([FromQuery] string? returnUrl = null)
+        public IActionResult Login(
+            [FromQuery] string? returnUrl = null,
+            [FromQuery] string? returnTo = null)
         {
             try
             {
                 var authority = _configuration["OAuth:Authority"];
                 var clientId = _configuration["OAuth:ClientId"];
                 var scope = _configuration["OAuth:Scope"] ?? "openid profile email";
-                var callbackPath = _configuration["OAuth:CallbackPath"] ?? "/signin-oidc";
                 var responseType = _configuration["OAuth:ResponseType"] ?? "code";
 
-                var redirectUri = $"{Request.Scheme}://{Request.Host}{callbackPath}";
-                if (!string.IsNullOrEmpty(returnUrl))
+                if (!OAuthRedirectUrlHelper.TryResolveFrontendReturnUrl(
+                        _configuration,
+                        returnUrl,
+                        out var safeReturnUrl))
                 {
-                    redirectUri += $"?returnUrl={Uri.EscapeDataString(returnUrl)}";
+                    _logger.LogWarning("Rejected untrusted OAuth return URL");
+                    return ValidationErrorResponse("The return URL is not allowed.");
                 }
+
+                if (!OAuthRedirectUrlHelper.TryResolveFrontendReturnPath(
+                        returnTo,
+                        out var safeReturnTo))
+                {
+                    _logger.LogWarning("Rejected untrusted OAuth return destination");
+                    return ValidationErrorResponse("The return destination is not allowed.");
+                }
+
+                var redirectUri = OAuthRedirectUrlHelper.BuildCallbackUri(
+                    Request,
+                    _configuration,
+                    "OAuth",
+                    "/api/oauth/callback");
 
                 var state = Guid.NewGuid().ToString();
                 HttpContext.Session.SetString("oauth_state", state);
+                HttpContext.Session.SetString("oauth_return_url", safeReturnUrl);
+                HttpContext.Session.SetString("oauth_redirect_uri", redirectUri);
+                if (safeReturnTo is not null)
+                {
+                    HttpContext.Session.SetString("oauth_return_to", safeReturnTo);
+                }
 
-                var authUrl = $"{authority}/oauth2/v2.0/authorize?" +
+                var authorizeEndpoint = MicrosoftOAuthEndpointBuilder.BuildV2Endpoint(authority, "authorize");
+                var authUrl = $"{authorizeEndpoint}?" +
                     $"client_id={clientId}&" +
                     $"response_type={responseType}&" +
                     $"redirect_uri={Uri.EscapeDataString(redirectUri)}&" +
@@ -89,11 +125,28 @@ namespace Ecommerce.API.Controllers
                     return BadRequest(new { error = "Invalid state parameter" });
                 }
 
-                var callbackPath = _configuration["OAuth:CallbackPath"] ?? "/signin-oidc";
-                var redirectUri = $"{Request.Scheme}://{Request.Host}{callbackPath}";
-                if (!string.IsNullOrEmpty(returnUrl))
+                HttpContext.Session.Remove("oauth_state");
+
+                var redirectUri = HttpContext.Session.GetString("oauth_redirect_uri") ??
+                    OAuthRedirectUrlHelper.BuildCallbackUri(
+                        Request,
+                        _configuration,
+                        "OAuth",
+                        "/api/oauth/callback");
+                HttpContext.Session.Remove("oauth_redirect_uri");
+
+                var storedReturnUrl = HttpContext.Session.GetString("oauth_return_url");
+                HttpContext.Session.Remove("oauth_return_url");
+                var safeReturnTo = HttpContext.Session.GetString("oauth_return_to");
+                HttpContext.Session.Remove("oauth_return_to");
+                var requestedReturnUrl = storedReturnUrl ?? returnUrl;
+                if (!OAuthRedirectUrlHelper.TryResolveFrontendReturnUrl(
+                        _configuration,
+                        requestedReturnUrl,
+                        out var safeReturnUrl))
                 {
-                    redirectUri += $"?returnUrl={Uri.EscapeDataString(returnUrl)}";
+                    _logger.LogWarning("Rejected untrusted OAuth callback return URL");
+                    return ValidationErrorResponse("The return URL is not allowed.");
                 }
 
                 var tokenResult = await _oauthService.ExchangeCodeForTokenAsync(code, redirectUri);
@@ -112,16 +165,22 @@ namespace Ecommerce.API.Controllers
                     return BadRequest(new { error = "Failed to retrieve user information" });
                 }
 
+                var dbUser = await _externalUserService.UpsertAsync(
+                    "microsoft",
+                    userInfo,
+                    HttpContext.RequestAborted);
+
                 var claims = new List<Claim>
                 {
-                    new(ClaimTypes.NameIdentifier, userInfo.Subject),
-                    new(ClaimTypes.Email, userInfo.Email),
-                    new(ClaimTypes.Name, userInfo.Name),
-                    new(ClaimTypes.GivenName, userInfo.GivenName),
-                    new(ClaimTypes.Surname, userInfo.FamilyName),
-                    new("picture", userInfo.Picture),
+                    new(ClaimTypes.NameIdentifier, dbUser.Id.ToString()),
+                    new(ClaimTypes.Email, dbUser.Email),
+                    new(ClaimTypes.Name, userInfo.Name ?? string.Empty),
+                    new(ClaimTypes.GivenName, dbUser.FirstName),
+                    new(ClaimTypes.Surname, dbUser.LastName),
+                    new("external_subject", userInfo.Subject),
+                    new("picture", userInfo.Picture ?? string.Empty),
                     new("access_token", tokenResult.AccessToken),
-                    new("id_token", tokenResult.IdToken)
+                    new("id_token", tokenResult.IdToken ?? string.Empty)
                 };
 
                 if (!string.IsNullOrEmpty(tokenResult.RefreshToken))
@@ -134,36 +193,29 @@ namespace Ecommerce.API.Controllers
 
                 await HttpContext.SignInAsync("Cookie", principal);
 
-                // Generate JWT token for API access
-                var jwtClaims = new[]
-                {
-                    new Claim(ClaimTypes.NameIdentifier, userInfo.Subject),
-                    new Claim(ClaimTypes.Email, userInfo.Email),
-                    new Claim(ClaimTypes.Name, userInfo.Name),
-                    new Claim(ClaimTypes.GivenName, userInfo.GivenName),
-                    new Claim(ClaimTypes.Surname, userInfo.FamilyName),
-                    new Claim(ClaimTypes.Role, "User") // Default role for OAuth users
-                };
-
-                var jwtIdentity = new ClaimsIdentity(jwtClaims, "JWT");
-                var jwtPrincipal = new ClaimsPrincipal(jwtIdentity);
-                // Generate a temporary ID for OAuth users since Subject might not be a valid long
-                var tempId = Math.Abs(userInfo.Subject.GetHashCode());
-                var jwtToken = _jwtTokenGenerator.GenerateToken(new Ecommerce.Domain.Entities.ApplicationUser
-                {
-                    Id = tempId,
-                    Email = userInfo.Email,
-                    FirstName = userInfo.GivenName,
-                    LastName = userInfo.FamilyName,
-                    Role = "User"
-                });
+                var jwtToken = _jwtTokenGenerator.GenerateToken(dbUser);
 
                 _logger.LogInformation("Successfully authenticated user: {Email}", userInfo.Email);
 
-                var redirectUrl = !string.IsNullOrEmpty(returnUrl) ? returnUrl : "/";
-                // Add JWT token as query parameter for frontend to extract
-                var separator = redirectUrl.Contains("?") ? "&" : "?";
-                redirectUrl += $"{separator}jwt_token={Uri.EscapeDataString(jwtToken)}";
+                var authorizationCode = await _authorizationCodeStore.IssueAsync(
+                    "microsoft",
+                    new OAuthAuthorizationGrant(
+                        jwtToken,
+                        dbUser.Id,
+                        dbUser.FirstName,
+                        dbUser.LastName,
+                        dbUser.Email,
+                        dbUser.Role,
+                        userInfo.Picture,
+                        safeReturnTo,
+                        default),
+                    HttpContext.RequestAborted);
+                var redirectUrl = OAuthRedirectUrlHelper.AppendAuthorizationCode(
+                    safeReturnUrl,
+                    authorizationCode,
+                    "microsoft");
+                Response.Headers.CacheControl = "no-store";
+                Response.Headers["Referrer-Policy"] = "no-referrer";
                 return Redirect(redirectUrl);
             }
             catch (Exception ex)
@@ -171,6 +223,36 @@ namespace Ecommerce.API.Controllers
                 _logger.LogError(ex, "Error in OAuth callback");
                 return HandleException(ex, "OAuth authentication failed. Please try logging in again or contact support if the issue persists.");
             }
+        }
+
+        [HttpPost("exchange")]
+        [AllowAnonymous]
+        [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+        public async Task<ActionResult<OAuthCodeExchangeResponse>> Exchange(
+            [FromBody] OAuthCodeExchangeRequest? request,
+            CancellationToken cancellationToken)
+        {
+            if (string.IsNullOrWhiteSpace(request?.Code))
+            {
+                return ValidationErrorResponse<OAuthCodeExchangeResponse>(
+                    "The OAuth authorization code is required.");
+            }
+
+            var grant = await _authorizationCodeStore.ConsumeAsync(
+                "microsoft",
+                request.Code,
+                cancellationToken);
+            if (grant is null)
+            {
+                return ValidationErrorResponse<OAuthCodeExchangeResponse>(
+                    "The OAuth authorization code is invalid, expired, or has already been used.");
+            }
+
+            Response.Headers.CacheControl = "no-store";
+            return Ok(ApiResponse<OAuthCodeExchangeResponse>.Success(
+                ToExchangeResponse(grant),
+                "Success",
+                "OAuth authentication completed successfully"));
         }
 
         [HttpPost("logout")]
@@ -183,15 +265,22 @@ namespace Ecommerce.API.Controllers
                 
                 var authority = _configuration["OAuth:Authority"];
                 var clientId = _configuration["OAuth:ClientId"];
-                var postLogoutRedirectUri = $"{Request.Scheme}://{Request.Host}/";
+                OAuthRedirectUrlHelper.TryResolveFrontendReturnUrl(
+                    _configuration,
+                    "/",
+                    out var postLogoutRedirectUri);
                 
-                var logoutUrl = $"{authority}/oauth2/v2.0/logout?" +
+                var logoutEndpoint = MicrosoftOAuthEndpointBuilder.BuildV2Endpoint(authority, "logout");
+                var logoutUrl = $"{logoutEndpoint}?" +
                     $"client_id={clientId}&" +
                     $"post_logout_redirect_uri={Uri.EscapeDataString(postLogoutRedirectUri)}";
 
                 _logger.LogInformation("User logged out successfully");
                 
-                return Ok(new { logoutUrl });
+                return Ok(ApiResponse<OAuthLogoutResponse>.Success(
+                    new OAuthLogoutResponse(logoutUrl),
+                    "Success",
+                    "Logged out successfully"));
             }
             catch (Exception ex)
             {
@@ -226,5 +315,18 @@ namespace Ecommerce.API.Controllers
                 return HandleException(ex, "Unable to retrieve user information. Please try again or contact support if the issue persists.");
             }
         }
+
+        private static OAuthCodeExchangeResponse ToExchangeResponse(
+            OAuthAuthorizationGrant grant) =>
+            new(
+                grant.Token,
+                grant.UserId,
+                grant.FirstName,
+                grant.LastName,
+                grant.Email,
+                grant.Role,
+                $"{grant.FirstName} {grant.LastName}".Trim(),
+                grant.Picture,
+                grant.ReturnTo);
     }
 }

@@ -1,292 +1,133 @@
 using Ecommerce.API.Controllers;
 using Ecommerce.Application.Features.Payments.Models;
+using Ecommerce.Domain.Interfaces;
+using Ecommerce.Domain.Payments;
 using Ecommerce.Tests.Common;
 using FluentAssertions;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Moq;
-using Stripe;
-using Stripe.Checkout;
 
-namespace Ecommerce.Tests.Controllers
+namespace Ecommerce.Tests.Controllers;
+
+public class PaymentsControllerTests : ControllerTestBase
 {
-    public class PaymentsControllerTests : ControllerTestBase
+    private readonly Mock<ISecureCheckoutPaymentService> _paymentService = new();
+    private readonly PaymentsController _controller;
+
+    public PaymentsControllerTests()
     {
-        private readonly Mock<IConfiguration> _mockConfiguration;
-        private readonly PaymentsController _controller;
+        _controller = new PaymentsController(
+            _paymentService.Object,
+            Mock.Of<ILogger<PaymentsController>>());
+        SetupHttpContext();
+    }
 
-        public PaymentsControllerTests()
-        {
-            _mockConfiguration = new Mock<IConfiguration>();
-            _mockConfiguration.Setup(x => x["Stripe:SecretKey"]).Returns("sk_test_123456789");
-            _controller = new PaymentsController(_mockConfiguration.Object);
-            SetupHttpContext();
-        }
+    [Fact]
+    public async Task CreatePaymentIntent_UsesAuthenticatedUserAndCart_NotClientPricing()
+    {
+        SetupAuthenticatedUser(42);
+        SetupControllerContext(_controller);
+        _paymentService
+            .Setup(service => service.CreatePaymentIntentAsync(
+                42,
+                It.Is<IReadOnlyCollection<PaymentCartItem>>(items =>
+                    items.Count == 1 &&
+                    items.Single().ProductId == 7 &&
+                    items.Single().Quantity == 2),
+                "256a2247-5b53-4d5a-84a5-5d5cd3791868",
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new SecurePaymentIntentResult(
+                "pi_secure",
+                "pi_secure_secret",
+                2598,
+                "usd",
+                "fingerprint"));
 
-        [Fact]
-        public async Task CreatePaymentIntent_WithValidRequest_ReturnsExceptionResponse()
-        {
-            // Arrange
-            SetupAuthenticatedUser(1);
-            SetupControllerContext(_controller);
-
-            var request = new CreatePaymentIntentRequest
+        var result = await _controller.CreatePaymentIntent(
+            new CreatePaymentIntentRequest
             {
-                Amount = 2000, // ₹20.00 in paise
-                Currency = "inr",
-                Metadata = new Dictionary<string, string>
-                {
-                    { "orderId", "123" }
-                }
-            };
+                CheckoutReference = "256a2247-5b53-4d5a-84a5-5d5cd3791868",
+                Items =
+                [
+                    new CreatePaymentIntentItemRequest
+                    {
+                        ProductId = 7,
+                        Quantity = 2
+                    }
+                ]
+            },
+            CancellationToken.None);
 
-            // Act
-            var result = await _controller.CreatePaymentIntent(request);
+        result.Should().BeOfType<OkObjectResult>();
+        _paymentService.VerifyAll();
+    }
 
-            // Assert
-            result.Should().BeAssignableTo<IActionResult>();
-            var statusResult = result as ObjectResult;
-            statusResult.Should().NotBeNull();
-            statusResult!.StatusCode.Should().Be(500);
-        }
+    [Fact]
+    public async Task CreatePaymentIntent_WithoutItems_IsRejectedBeforeStripe()
+    {
+        SetupAuthenticatedUser(42);
+        SetupControllerContext(_controller);
 
-        [Fact]
-        public async Task CreatePaymentIntent_WithZeroAmount_ReturnsValidationErrorResponse()
-        {
-            // Arrange
-            SetupAuthenticatedUser(1);
-            SetupControllerContext(_controller);
+        var result = await _controller.CreatePaymentIntent(
+            new CreatePaymentIntentRequest(),
+            CancellationToken.None);
 
-            var request = new CreatePaymentIntentRequest
+        result.Should().BeOfType<BadRequestObjectResult>();
+        _paymentService.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public async Task CreatePaymentIntent_WithoutAuthenticatedSubject_IsRejected()
+    {
+        SetupUnauthenticatedUser();
+        SetupControllerContext(_controller);
+
+        var result = await _controller.CreatePaymentIntent(
+            new CreatePaymentIntentRequest
             {
-                Amount = 0,
-                Currency = "inr"
-            };
+                Items =
+                [
+                    new CreatePaymentIntentItemRequest
+                    {
+                        ProductId = 7,
+                        Quantity = 2
+                    }
+                ]
+            },
+            CancellationToken.None);
 
-            // Act
-            var result = await _controller.CreatePaymentIntent(request);
+        result.Should().BeOfType<UnauthorizedObjectResult>();
+        _paymentService.VerifyNoOtherCalls();
+    }
 
-            // Assert
-            result.Should().BeAssignableTo<IActionResult>();
-            var badRequestResult = result as BadRequestObjectResult;
-            badRequestResult.Should().NotBeNull();
-            badRequestResult!.StatusCode.Should().Be(400);
-        }
+    [Fact]
+    public async Task CreatePaymentIntent_WithInvalidServerCart_ReturnsBadRequest()
+    {
+        SetupAuthenticatedUser(42);
+        SetupControllerContext(_controller);
+        _paymentService
+            .Setup(service => service.CreatePaymentIntentAsync(
+                It.IsAny<long>(),
+                It.IsAny<IReadOnlyCollection<PaymentCartItem>>(),
+                It.IsAny<string?>(),
+                It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new PaymentValidationException("Product 7 is unavailable."));
 
-        [Fact]
-        public async Task CreatePaymentIntent_WithNegativeAmount_ReturnsValidationErrorResponse()
-        {
-            // Arrange
-            SetupAuthenticatedUser(1);
-            SetupControllerContext(_controller);
-
-            var request = new CreatePaymentIntentRequest
+        var result = await _controller.CreatePaymentIntent(
+            new CreatePaymentIntentRequest
             {
-                Amount = -100,
-                Currency = "inr"
-            };
+                Items =
+                [
+                    new CreatePaymentIntentItemRequest
+                    {
+                        ProductId = 7,
+                        Quantity = 2
+                    }
+                ]
+            },
+            CancellationToken.None);
 
-            // Act
-            var result = await _controller.CreatePaymentIntent(request);
-
-            // Assert
-            result.Should().BeAssignableTo<IActionResult>();
-            var badRequestResult = result as BadRequestObjectResult;
-            badRequestResult.Should().NotBeNull();
-            badRequestResult!.StatusCode.Should().Be(400);
-        }
-
-        [Fact]
-        public async Task CreatePaymentIntent_WithNullRequest_ReturnsExceptionResponse()
-        {
-            // Arrange
-            SetupAuthenticatedUser(1);
-            SetupControllerContext(_controller);
-
-            // Act
-            var result = await _controller.CreatePaymentIntent(null);
-
-            // Assert
-            result.Should().BeAssignableTo<IActionResult>();
-            var statusResult = result as ObjectResult;
-            statusResult.Should().NotBeNull();
-            statusResult!.StatusCode.Should().Be(500);
-        }
-
-        [Fact]
-        public async Task CreatePaymentIntent_WithInvalidStripeKey_ReturnsExceptionResponse()
-        {
-            // Arrange
-            SetupAuthenticatedUser(1);
-            SetupControllerContext(_controller);
-
-            var invalidConfig = new Mock<IConfiguration>();
-            invalidConfig.Setup(x => x["Stripe:SecretKey"]).Returns("invalid_key");
-            var controllerWithInvalidConfig = new PaymentsController(invalidConfig.Object);
-            SetupControllerContext(controllerWithInvalidConfig);
-
-            var request = new CreatePaymentIntentRequest
-            {
-                Amount = 2000,
-                Currency = "inr"
-            };
-
-            // Act
-            var result = await controllerWithInvalidConfig.CreatePaymentIntent(request);
-
-            // Assert
-            result.Should().BeAssignableTo<IActionResult>();
-            var statusResult = result as ObjectResult;
-            statusResult.Should().NotBeNull();
-            statusResult!.StatusCode.Should().Be(500);
-        }
-
-        [Fact]
-        public async Task CreatePaymentIntent_WithLargeAmount_ReturnsExceptionResponse()
-        {
-            // Arrange
-            SetupAuthenticatedUser(1);
-            SetupControllerContext(_controller);
-
-            var request = new CreatePaymentIntentRequest
-            {
-                Amount = 99999999, // Large amount
-                Currency = "inr"
-            };
-
-            // Act
-            var result = await _controller.CreatePaymentIntent(request);
-
-            // Assert
-            result.Should().BeAssignableTo<IActionResult>();
-            var statusResult = result as ObjectResult;
-            statusResult.Should().NotBeNull();
-            statusResult!.StatusCode.Should().Be(500);
-        }
-
-        [Fact]
-        public async Task CreatePaymentIntent_WithDifferentCurrency_ReturnsExceptionResponse()
-        {
-            // Arrange
-            SetupAuthenticatedUser(1);
-            SetupControllerContext(_controller);
-
-            var request = new CreatePaymentIntentRequest
-            {
-                Amount = 2000,
-                Currency = "inr"
-            };
-
-            // Act
-            var result = await _controller.CreatePaymentIntent(request);
-
-            // Assert
-            result.Should().BeAssignableTo<IActionResult>();
-            var statusResult = result as ObjectResult;
-            statusResult.Should().NotBeNull();
-            statusResult!.StatusCode.Should().Be(500);
-        }
-
-        [Fact]
-        public async Task CreatePaymentIntent_WithMetadata_ReturnsExceptionResponse()
-        {
-            // Arrange
-            SetupAuthenticatedUser(1);
-            SetupControllerContext(_controller);
-
-            var request = new CreatePaymentIntentRequest
-            {
-                Amount = 2000,
-                Currency = "inr",
-                Metadata = new Dictionary<string, string>
-                {
-                    { "orderId", "123" },
-                    { "userId", "456" },
-                    { "productId", "789" }
-                }
-            };
-
-            // Act
-            var result = await _controller.CreatePaymentIntent(request);
-
-            // Assert
-            result.Should().BeAssignableTo<IActionResult>();
-            var statusResult = result as ObjectResult;
-            statusResult.Should().NotBeNull();
-            statusResult!.StatusCode.Should().Be(500);
-        }
-
-        [Fact]
-        public async Task CreatePaymentIntent_WithEmptyMetadata_ReturnsExceptionResponse()
-        {
-            // Arrange
-            SetupAuthenticatedUser(1);
-            SetupControllerContext(_controller);
-
-            var request = new CreatePaymentIntentRequest
-            {
-                Amount = 2000,
-                Currency = "inr",
-                Metadata = new Dictionary<string, string>()
-            };
-
-            // Act
-            var result = await _controller.CreatePaymentIntent(request);
-
-            // Assert
-            result.Should().BeAssignableTo<IActionResult>();
-            var statusResult = result as ObjectResult;
-            statusResult.Should().NotBeNull();
-            statusResult!.StatusCode.Should().Be(500);
-        }
-
-        [Fact]
-        public async Task CreatePaymentIntent_WithNullMetadata_ReturnsExceptionResponse()
-        {
-            // Arrange
-            SetupAuthenticatedUser(1);
-            SetupControllerContext(_controller);
-
-            var request = new CreatePaymentIntentRequest
-            {
-                Amount = 2000,
-                Currency = "inr",
-                Metadata = null
-            };
-
-            // Act
-            var result = await _controller.CreatePaymentIntent(request);
-
-            // Assert
-            result.Should().BeAssignableTo<IActionResult>();
-            var statusResult = result as ObjectResult;
-            statusResult.Should().NotBeNull();
-            statusResult!.StatusCode.Should().Be(500);
-        }
-
-        [Fact]
-        public async Task CreatePaymentIntent_WithMinimalAmount_ReturnsExceptionResponse()
-        {
-            // Arrange
-            SetupAuthenticatedUser(1);
-            SetupControllerContext(_controller);
-
-            var request = new CreatePaymentIntentRequest
-            {
-                Amount = 1, // Minimum amount
-                Currency = "inr"
-            };
-
-            // Act
-            var result = await _controller.CreatePaymentIntent(request);
-
-            // Assert
-            result.Should().BeAssignableTo<IActionResult>();
-            var statusResult = result as ObjectResult;
-            statusResult.Should().NotBeNull();
-            statusResult!.StatusCode.Should().Be(500);
-        }
+        result.Should().BeOfType<BadRequestObjectResult>();
     }
 }
-

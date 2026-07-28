@@ -6,6 +6,7 @@ using Ecommerce.Application.Features.Orders.Commands;
 using Ecommerce.Application.Features.Orders.Models;
 using Ecommerce.Application.Features.Orders.Queries;
 using Ecommerce.Domain.Interfaces;
+using Ecommerce.Domain.Payments;
 using Ecommerce.Infrastructure.Services;
 using HotChocolate.Subscriptions;
 using MediatR;
@@ -24,6 +25,7 @@ namespace Ecommerce.OrderService.Controllers
         private readonly IEventGridPublisherService _eventGridPublisher;
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly IUserContextService _userContext;
+        private readonly ISecureCheckoutPaymentService _paymentService;
         private readonly IConfiguration _configuration;
         private readonly ILogger<OrdersController> _logger;
  
@@ -33,6 +35,7 @@ namespace Ecommerce.OrderService.Controllers
             IEventGridPublisherService eventGridPublisher,
             IHttpClientFactory httpClientFactory,
             IUserContextService userContext,
+            ISecureCheckoutPaymentService paymentService,
             IConfiguration configuration,
             ILogger<OrdersController> logger)
         {
@@ -41,13 +44,16 @@ namespace Ecommerce.OrderService.Controllers
             _eventGridPublisher = eventGridPublisher;
             _httpClientFactory = httpClientFactory;
             _userContext = userContext;
+            _paymentService = paymentService;
             _configuration = configuration;
             _logger = logger;
         }
 
         [Authorize]
         [HttpPost("checkout")]
-        public async Task<IActionResult> Checkout([FromBody] CheckoutOrderCommand command)
+        public async Task<IActionResult> Checkout(
+            [FromBody] CheckoutOrderCommand command,
+            CancellationToken cancellationToken = default)
         {
             var startTime = DateTime.UtcNow;
             var requestId = Guid.NewGuid().ToString("N")[..8];
@@ -92,9 +98,161 @@ namespace Ecommerce.OrderService.Controllers
                     });
                 }
 
+                var userIdValue = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                if (!long.TryParse(userIdValue, out var authenticatedUserId))
+                {
+                    return Unauthorized(new ApiResponse<object>
+                    {
+                        IsSuccessful = false,
+                        Status = "Unauthorized",
+                        StatusReason = "A valid authenticated user is required."
+                    });
+                }
+
+                if (string.IsNullOrWhiteSpace(command.PaymentIntentId))
+                {
+                    return BadRequest(new ApiResponse<object>
+                    {
+                        IsSuccessful = false,
+                        Status = "PaymentRequired",
+                        StatusReason = "A succeeded PaymentIntent is required before checkout."
+                    });
+                }
+
+                VerifiedCheckoutPayment verifiedPayment;
+                try
+                {
+                    verifiedPayment = await _paymentService.VerifyCheckoutPaymentAsync(
+                        authenticatedUserId,
+                        command.PaymentIntentId,
+                        command.Items
+                            .Select(item => new PaymentCartItem(item.ProductId, item.Quantity))
+                            .ToArray(),
+                        cancellationToken);
+                }
+                catch (PaymentValidationException ex)
+                {
+                    return BadRequest(new ApiResponse<object>
+                    {
+                        IsSuccessful = false,
+                        Status = "ValidationError",
+                        StatusReason = ex.Message
+                    });
+                }
+                catch (PaymentRejectedException ex)
+                {
+                    return StatusCode(StatusCodes.Status409Conflict, new ApiResponse<object>
+                    {
+                        IsSuccessful = false,
+                        Status = "PaymentRejected",
+                        StatusReason = ex.Message
+                    });
+                }
+
+                if (verifiedPayment.ExistingOrderId.HasValue)
+                {
+                    return Ok(new ApiResponse<object>
+                    {
+                        IsSuccessful = true,
+                        Status = "Success",
+                        StatusReason = "This payment was already processed; returning the existing order.",
+                        Data = new
+                        {
+                            orderId = verifiedPayment.ExistingOrderId.Value.ToString(),
+                            replayed = true
+                        }
+                    });
+                }
+
+                command.VerifiedCartFingerprint = verifiedPayment.CartFingerprint;
+                command.VerifiedTotalAmount = verifiedPayment.TotalAmount;
+                command.VerifiedCurrency = verifiedPayment.Currency;
+
                 _logger.LogInformation("[{RequestId}] Sending order command to mediator...", requestId);
                 var mediatorStartTime = DateTime.UtcNow;
-                var orderId = await _mediator.Send(command);
+                Guid orderId;
+                try
+                {
+                    orderId = await _mediator.Send(command, cancellationToken);
+                }
+                catch (Exception orderException)
+                {
+                    // A concurrent retry can win the unique PaymentIntent index. In that
+                    // case the existing same-user order is the idempotent success result.
+                    for (var replayAttempt = 1; replayAttempt <= 3; replayAttempt++)
+                    {
+                        try
+                        {
+                            var replay = await _paymentService.VerifyCheckoutPaymentAsync(
+                                authenticatedUserId,
+                                command.PaymentIntentId,
+                                command.Items
+                                    .Select(item => new PaymentCartItem(item.ProductId, item.Quantity))
+                                    .ToArray(),
+                                CancellationToken.None);
+                            if (replay.ExistingOrderId.HasValue)
+                            {
+                                return Ok(new ApiResponse<object>
+                                {
+                                    IsSuccessful = true,
+                                    Status = "Success",
+                                    StatusReason = "This payment was already processed; returning the existing order.",
+                                    Data = new
+                                    {
+                                        orderId = replay.ExistingOrderId.Value.ToString(),
+                                        replayed = true
+                                    }
+                                });
+                            }
+                        }
+                        catch (Exception replayException)
+                        {
+                            _logger.LogWarning(
+                                replayException,
+                                "Could not resolve checkout {PaymentIntentId} as an idempotent replay (attempt {ReplayAttempt}).",
+                                command.PaymentIntentId,
+                                replayAttempt);
+                        }
+
+                        if (replayAttempt < 3)
+                        {
+                            await Task.Delay(TimeSpan.FromMilliseconds(100 * replayAttempt));
+                        }
+                    }
+
+                    try
+                    {
+                        // Compensation must not be cancelled when the HTTP request is
+                        // disconnected after Stripe captured the payment.
+                        await _paymentService.RefundAfterOrderFailureAsync(
+                            command.PaymentIntentId,
+                            CancellationToken.None);
+                    }
+                    catch (Exception refundException)
+                    {
+                        _logger.LogCritical(
+                            refundException,
+                            "Order creation failed and automatic refund failed for {PaymentIntentId}.",
+                            command.PaymentIntentId);
+                        return StatusCode(500, new ApiResponse<object>
+                        {
+                            IsSuccessful = false,
+                            Status = "RefundRequired",
+                            StatusReason = $"Payment {command.PaymentIntentId} succeeded, but the order and automatic refund failed. Contact support immediately with this payment reference."
+                        });
+                    }
+
+                    _logger.LogError(
+                        orderException,
+                        "Order creation failed after payment {PaymentIntentId}; the payment was automatically refunded.",
+                        command.PaymentIntentId);
+                    return StatusCode(500, new ApiResponse<object>
+                    {
+                        IsSuccessful = false,
+                        Status = "OrderFailedPaymentRefunded",
+                        StatusReason = "The order could not be created. The successful payment was automatically refunded."
+                    });
+                }
                 var mediatorDuration = DateTime.UtcNow - mediatorStartTime;
                 _logger.LogInformation(
                     "[{RequestId}] Order created successfully with ID: {OrderId} in {Duration}ms",
@@ -112,7 +270,7 @@ namespace Ecommerce.OrderService.Controllers
                         orderId,
                         userId,
                         userEmail,
-                        0m,
+                        verifiedPayment.TotalAmount,
                         DateTime.UtcNow,
                         orderNumber);
                 }

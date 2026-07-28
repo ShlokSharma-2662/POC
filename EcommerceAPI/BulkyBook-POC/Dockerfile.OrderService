@@ -1,0 +1,33 @@
+# Runtime image
+FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS base
+WORKDIR /app
+EXPOSE 8080
+ENV ASPNETCORE_URLS=http://+:8080
+
+# Build image
+FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
+WORKDIR /src
+
+COPY ["Directory.Build.props", "./"]
+COPY ["Directory.Packages.props", "./"]
+COPY ["Ecommerce.OrderService/Ecommerce.OrderService.csproj", "Ecommerce.OrderService/"]
+COPY ["Ecommerce.Application/Ecommerce.Application.csproj", "Ecommerce.Application/"]
+COPY ["Ecommerce.Domain/Ecommerce.Domain.csproj", "Ecommerce.Domain/"]
+COPY ["Ecommerce.Infrastructure/Ecommerce.Infrastructure.csproj", "Ecommerce.Infrastructure/"]
+
+RUN dotnet restore "Ecommerce.OrderService/Ecommerce.OrderService.csproj"
+
+COPY . .
+
+WORKDIR "/src/Ecommerce.OrderService"
+RUN dotnet publish "Ecommerce.OrderService.csproj" -c Release -o /app/publish /p:UseAppHost=false
+
+# Final image
+FROM base AS final
+WORKDIR /app
+COPY --from=build /app/publish .
+
+RUN adduser --disabled-password --gecos "" appuser && chown -R appuser /app
+USER appuser
+
+ENTRYPOINT ["dotnet", "Ecommerce.OrderService.dll"]

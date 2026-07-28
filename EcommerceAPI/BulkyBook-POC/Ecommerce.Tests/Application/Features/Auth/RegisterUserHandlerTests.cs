@@ -213,7 +213,7 @@ namespace Ecommerce.Tests.Application.Features.Auth
         }
 
         [Fact]
-        public async Task Handle_WithCustomRole_ShouldSetRole()
+        public async Task Handle_WithPrivilegedRole_ShouldForceUserRole()
         {
             // Arrange
             var expectedToken = "mock-jwt-token";
@@ -235,11 +235,11 @@ namespace Ecommerce.Tests.Application.Features.Auth
 
             // Assert
             result.Should().NotBeNull();
-            result.Role.Should().Be("Admin");
+            result.Role.Should().Be("User");
             
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == "admin@example.com");
             user.Should().NotBeNull();
-            user!.Role.Should().Be("Admin");
+            user!.Role.Should().Be("User");
         }
 
         [Fact]
@@ -389,4 +389,3 @@ namespace Ecommerce.Tests.Application.Features.Auth
         }
     }
 }
-

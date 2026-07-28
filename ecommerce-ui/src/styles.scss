@@ -1,18 +1,44 @@
 @import 'ngx-toastr/toastr';
 
 :root {
-  --primary-color: #0f172a;
-  --secondary-color: #64748b;
-  --accent-color: #e8f5e8;
-  --border-color: #e2e8f0;
-  --background-color: #f8f9fa;
-  --white: #ffffff;
-  --success-color: #22c55e;
-  --error-color: #ef4444;
-  --warning-color: #f59e0b;
-  --info-color: #3b82f6;
+  --primary: #4F46E5;
+  --primary-hover: #4338CA;
+  --primary-light: #EEF2FF;
+  --primary-dark: #3730A3;
+  --accent: #F59E0B;
+  --accent-light: #FEF3C7;
 
-  /* Z-Index System - Standardized Layering */
+  --text-primary: #1E293B;
+  --text-secondary: #64748B;
+  --text-muted: #94A3B8;
+
+  --bg: #F8FAFC;
+  --surface: #FFFFFF;
+  --border: #E2E8F0;
+  --border-light: #F1F5F9;
+
+  --success: #10B981;
+  --success-light: #D1FAE5;
+  --error: #EF4444;
+  --error-light: #FEE2E2;
+  --warning: #F59E0B;
+  --warning-light: #FEF3C7;
+  --info: #3B82F6;
+  --info-light: #DBEAFE;
+
+  --shadow-xs: 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.07), 0 2px 4px -2px rgba(0,0,0,0.05);
+  --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.08), 0 4px 6px -4px rgba(0,0,0,0.04);
+  --shadow-xl: 0 20px 25px -5px rgba(0,0,0,0.08), 0 8px 10px -6px rgba(0,0,0,0.03);
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --radius-full: 9999px;
+
+  /* Z-Index System */
   --z-background: 1;
   --z-content: 2;
   --z-sticky: 10;
@@ -23,11 +49,25 @@
   --z-notification: 9999;
   --z-toast: 99999;
 
-  /* Layout Dimensions */
-  --navbar-height: 64px;
+  --navbar-height: 68px;
+
+  /* Legacy aliases for backward compat */
+  --primary-color: var(--text-primary);
+  --secondary-color: var(--text-secondary);
+  --accent-color: var(--primary-light);
+  --border-color: var(--border);
+  --background-color: var(--bg);
+  --white: var(--surface);
+  --success-color: var(--success);
+  --error-color: var(--error);
+  --warning-color: var(--warning);
+  --info-color: var(--info);
 }
 
-// Global layout structure
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
 html, body {
   height: 100%;
   margin: 0;
@@ -35,25 +75,25 @@ html, body {
 }
 
 body {
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  background-color: var(--background-color);
-  color: var(--primary-color);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: var(--bg);
+  color: var(--text-primary);
   line-height: 1.6;
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-// Ensure proper layout for admin pages
 app-admin-navbar + * {
   flex: 1;
   display: flex;
   flex-direction: column;
-  justify-content: center; /* vertical align */
-  align-items: center;     /* horizontal align (optional) */
+  justify-content: center;
+  align-items: center;
 }
 
-// Ensure footer sticks to bottom
 app-admin-footer {
   margin-top: auto;
   flex-shrink: 0;
@@ -61,111 +101,114 @@ app-admin-footer {
 
 a {
   text-decoration: none;
-  color: var(--primary-color);
+  color: var(--primary);
   transition: color 0.2s ease;
 }
 
 a:hover {
-  color: var(--secondary-color);
+  color: var(--primary-hover);
 }
 
 .card {
-  border-radius: 12px;
-  border: 1px solid var(--border-color);
-  background: var(--white);
-  transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
 
   &:hover {
     transform: translateY(-4px);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--shadow-lg);
   }
 }
 
-/* Form elements */
 .form-control, .form-select {
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  color: var(--primary-color);
-  
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-family: 'Inter', sans-serif;
+  font-size: 0.875rem;
+  padding: 0.625rem 0.875rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+
   &:focus {
-    border-color: var(--accent-color);
-    box-shadow: 0 0 0 0.2rem rgba(232, 245, 232, 0.25);
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+    outline: none;
+  }
+
+  &::placeholder {
+    color: var(--text-muted);
   }
 }
 
-/* Buttons */
 .btn-primary {
-  background-color: var(--primary-color);
-  border-color: var(--primary-color);
-  border-radius: 8px;
-  
+  background: var(--primary);
+  border-color: var(--primary);
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  font-family: 'Inter', sans-serif;
+  transition: all 0.2s ease;
+
   &:hover {
-    background-color: var(--secondary-color);
-    border-color: var(--secondary-color);
+    background: var(--primary-hover);
+    border-color: var(--primary-hover);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25);
   }
 }
 
 .btn-outline-primary {
-  color: var(--primary-color);
-  border-color: var(--primary-color);
-  border-radius: 8px;
-  
+  color: var(--primary);
+  border-color: var(--primary);
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  font-family: 'Inter', sans-serif;
+
   &:hover {
-    background-color: var(--primary-color);
-    border-color: var(--primary-color);
+    background: var(--primary);
+    border-color: var(--primary);
+    color: white;
   }
 }
 
-/* Professional toast theme */
+/* Toast theme */
 .toast-container .ngx-toastr {
-  background: var(--white);
-  color: var(--primary-color);
-  border: 1px solid var(--border-color);
-  border-radius: 10px;
-  padding: 0.5rem 0.75rem; /* Reduced overall toast padding */
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
-  opacity: 0.98;
-  max-width: 300px; /* Make toast a bit narrower */
+  background: var(--surface);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0.75rem 1rem;
+  box-shadow: var(--shadow-lg);
+  opacity: 1;
+  max-width: 340px;
+  font-family: 'Inter', sans-serif;
+  backdrop-filter: blur(8px);
 }
 
-.toast-container .toast-title { 
-  font-weight: 600; 
-  letter-spacing: 0.2px; 
-  color: var(--primary-color); 
-  font-size: 0.95rem; /* Smaller title */
+.toast-container .toast-title {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+  font-size: 0.875rem;
 }
 
-.toast-container .toast-message { 
-  opacity: 0.9; 
-  color: var(--secondary-color); 
-  font-size: 0.85rem; /* Smaller message */
+.toast-container .toast-message {
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+  line-height: 1.4;
 }
 
-/* Variant accents */
-.toast-success { 
-  border-left: 4px solid var(--success-color) !important; 
+.toast-success { border-left: 3px solid var(--success) !important; }
+.toast-error   { border-left: 3px solid var(--error) !important; }
+.toast-info    { border-left: 3px solid var(--info) !important; }
+.toast-warning { border-left: 3px solid var(--warning) !important; }
+
+.ngx-toastr-progress-bar {
+  height: 2px;
+  background: var(--primary) !important;
+  opacity: 0.8;
 }
 
-.toast-error { 
-  border-left: 4px solid var(--error-color) !important; 
-}
-
-.toast-info { 
-  border-left: 4px solid var(--info-color) !important; 
-}
-
-.toast-warning { 
-  border-left: 4px solid var(--warning-color) !important; 
-}
-
-/* Progress bar subtle */
-.ngx-toastr-progress-bar { 
-  height: 2px; /* Slimmer progress bar */
-  background: var(--accent-color) !important; 
-  opacity: 0.9; 
-}
-
-/* Ensure toasts are fixed to the viewport top, above any sticky headers */
 .toast-container {
   position: fixed !important;
   z-index: var(--z-toast) !important;
@@ -173,74 +216,49 @@ a:hover {
 
 .toast-top-right {
   top: 80px !important;
-  right: 12px !important;
+  right: 16px !important;
 }
 
-/* Close (cancel) button styling */
 .toast-container .toast-close-button {
-  color: var(--secondary-color) !important;
-  opacity: 0.8 !important;
+  color: var(--text-muted) !important;
+  opacity: 1 !important;
   text-shadow: none !important;
-  font-size: 0.9rem !important; /* Slightly smaller close button */
-  margin-top: -2px; /* Tighten spacing */
+  font-size: 0.875rem !important;
 }
 
 .toast-container .toast-close-button:hover {
-  color: var(--primary-color) !important;
-  opacity: 1 !important;
+  color: var(--text-primary) !important;
 }
 
-/* Badge styling */
 .badge {
-  background-color: var(--accent-color);
-  color: var(--primary-color);
+  background-color: var(--primary-light);
+  color: var(--primary);
   font-weight: 500;
-  border-radius: 20px;
+  border-radius: var(--radius-full);
   padding: 0.25rem 0.75rem;
+  font-size: 0.75rem;
 }
 
-/* Text utilities */
-.text-primary {
-  color: var(--primary-color) !important;
-}
+.text-primary { color: var(--text-primary) !important; }
+.text-secondary { color: var(--text-secondary) !important; }
+.text-muted { color: var(--text-muted) !important; }
+.bg-light { background-color: var(--bg) !important; }
+.bg-white { background-color: var(--surface) !important; }
+.bg-light-green { background-color: var(--success-light) !important; }
 
-.text-secondary {
-  color: var(--secondary-color) !important;
-}
-
-.text-muted {
-  color: var(--secondary-color) !important;
-}
-
-/* Background utilities */
-.bg-light {
-  background-color: var(--background-color) !important;
-}
-
-.bg-white {
-  background-color: var(--white) !important;
-}
-
-.bg-light-green {
-  background-color: var(--accent-color) !important;
-}
-
-/* Responsive utilities */
+/* Responsive */
 @media (max-width: 768px) {
   .container {
     padding-left: 1rem;
     padding-right: 1rem;
   }
-  
   .table-responsive {
-    border-radius: 8px;
+    border-radius: var(--radius-md);
     overflow: hidden;
   }
-  
-  /* Adjust toaster position for mobile navbar */
   .toast-top-right {
-    top: 70px !important;
-    right: 8px !important;
+    top: 72px !important;
+    right: 12px !important;
   }
 }
 
@@ -249,27 +267,21 @@ a:hover {
     padding-left: 0.75rem;
     padding-right: 0.75rem;
   }
-  
-  /* Further adjust toaster position for very small screens */
   .toast-top-right {
-    top: 65px !important;
-    right: 6px !important;
+    top: 68px !important;
+    right: 8px !important;
   }
 }
 
-/* Global loader animations */
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
 
-/* Ensure loader z-index is above all other elements */
 app-loader {
   z-index: var(--z-notification);
 }
 
-/* Clean admin table styling - no sticky positioning */
 .admin-nav + * .table {
-  margin-top: 1rem; /* Ensure proper spacing from navbar */
+  margin-top: 1rem;
 }
-  

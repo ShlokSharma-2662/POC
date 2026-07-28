@@ -9,6 +9,7 @@ namespace Ecommerce.Infrastructure.Caching
         Task InvalidateCategoryCacheAsync();
         Task InvalidateOrderCacheAsync(Guid? orderId = null);
         Task InvalidateAllOrdersCacheAsync();
+        Task InvalidateCartCacheAsync(long userId);
         Task InvalidateWishlistCacheAsync(long userId);
     }
 }

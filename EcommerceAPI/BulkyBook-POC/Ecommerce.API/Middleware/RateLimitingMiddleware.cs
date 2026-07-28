@@ -30,7 +30,12 @@ namespace Ecommerce.API.Middleware
                 
                 context.Response.Headers["X-RateLimit-Limit"] = rateLimitResult.Limit.ToString(CultureInfo.InvariantCulture);
                 context.Response.Headers["X-RateLimit-Remaining"] = rateLimitResult.Remaining.ToString(CultureInfo.InvariantCulture);
-                context.Response.Headers["X-RateLimit-Reset"] = rateLimitResult.ResetTime.ToString("O", CultureInfo.InvariantCulture);
+                var resetTimeUtc = rateLimitResult.ResetTime.Kind == DateTimeKind.Utc
+                    ? rateLimitResult.ResetTime
+                    : rateLimitResult.ResetTime.ToUniversalTime();
+                var resetTimestamp = new DateTimeOffset(resetTimeUtc).ToUnixTimeSeconds();
+                context.Response.Headers["X-RateLimit-Reset"] = resetTimestamp.ToString(CultureInfo.InvariantCulture);
+                context.Response.Headers["X-RateLimit-Reset-At"] = resetTimeUtc.ToString("O", CultureInfo.InvariantCulture);
 
                 if (!rateLimitResult.IsAllowed)
                 {
@@ -38,14 +43,14 @@ namespace Ecommerce.API.Middleware
                     
                     context.Response.StatusCode = (int)HttpStatusCode.TooManyRequests;
                     context.Response.ContentType = "application/json";
-                    var retryAfterSeconds = Math.Max(0, (int)Math.Ceiling((rateLimitResult.ResetTime - DateTime.UtcNow).TotalSeconds));
+                    var retryAfterSeconds = Math.Max(0, (int)Math.Ceiling((resetTimeUtc - DateTime.UtcNow).TotalSeconds));
                     context.Response.Headers["Retry-After"] = retryAfterSeconds.ToString(CultureInfo.InvariantCulture);
                     
                     var response = new
                     {
                         error = "Rate limit exceeded",
                         message = "Too many requests. Please try again later.",
-                        retryAfter = (int)(rateLimitResult.ResetTime - DateTime.UtcNow).TotalSeconds
+                        retryAfter = retryAfterSeconds
                     };
                     
                     await context.Response.WriteAsync(JsonSerializer.Serialize(response));

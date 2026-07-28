@@ -326,7 +326,7 @@ namespace Ecommerce.Tests.Application.Features.Orders
             var product = CreateProduct(1, "Test Product", 100.00m);
             _context.Products.Add(product);
             
-            var statuses = new[] { "Pending", "Processing", "Shipped", "Delivered", "Cancelled" };
+            var statuses = new[] { "Pending", "Confirmed", "Shipped", "Delivered", "Cancelled" };
             var orders = statuses.Select((status, index) => new Order
             {
                 Id = Guid.NewGuid(),

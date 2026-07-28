@@ -39,7 +39,9 @@ namespace Ecommerce.Application.Features.Auth.Handlers
                 FirstName = request.FirstName,
                 LastName = request.LastName,
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
-                Role = string.IsNullOrWhiteSpace(request.Role) ? "User" : request.Role
+                // Public registration must never grant privileged roles. Admin
+                // accounts are provisioned through authenticated admin tooling.
+                Role = "User"
             };
 
             _context.Users.Add(user);

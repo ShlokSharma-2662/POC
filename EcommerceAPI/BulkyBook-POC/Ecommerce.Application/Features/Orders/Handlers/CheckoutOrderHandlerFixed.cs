@@ -16,7 +16,7 @@ namespace Ecommerce.Application.Features.Orders.Handlers
     /// <summary>
     /// Fixed CheckoutOrderHandler with proper concurrency control and race condition prevention
     /// </summary>
-    public class CheckoutOrderHandlerFixed : IRequestHandler<CheckoutOrderCommand, Guid>
+    public class CheckoutOrderHandlerFixed
     {
         private readonly AppDbContext _context;
         private readonly IHttpContextAccessor _httpContextAccessor;

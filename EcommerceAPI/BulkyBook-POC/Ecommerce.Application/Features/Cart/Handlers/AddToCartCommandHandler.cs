@@ -1,6 +1,7 @@
 using Ecommerce.Application.Features.Cart.Commands;
 using Ecommerce.Application.Features.Cart.Models;
 using Ecommerce.Domain.Entities;
+using Ecommerce.Infrastructure.Caching;
 using Ecommerce.Infrastructure.Persistence;
 using MediatR;
 using Microsoft.AspNetCore.Http;
@@ -15,11 +16,16 @@ namespace Ecommerce.Application.Features.Cart.Handlers
     {
         private readonly AppDbContext _context;
         private readonly IHttpContextAccessor _httpContextAccessor;
+        private readonly ICacheInvalidationService _cacheInvalidationService;
 
-        public AddToCartCommandHandler(AppDbContext context, IHttpContextAccessor httpContextAccessor)
+        public AddToCartCommandHandler(
+            AppDbContext context,
+            IHttpContextAccessor httpContextAccessor,
+            ICacheInvalidationService cacheInvalidationService)
         {
             _context = context;
             _httpContextAccessor = httpContextAccessor;
+            _cacheInvalidationService = cacheInvalidationService;
         }
 
         public async Task<AddToCartResult> Handle(AddToCartCommand request, CancellationToken cancellationToken)
@@ -85,6 +91,11 @@ namespace Ecommerce.Application.Features.Cart.Handlers
             }
 
             await _context.SaveChangesAsync(cancellationToken);
+            if (long.TryParse(userId, out var numericUserId))
+            {
+                await _cacheInvalidationService.InvalidateCartCacheAsync(numericUserId);
+            }
+
             return new AddToCartResult
             {
                 Success = true,
