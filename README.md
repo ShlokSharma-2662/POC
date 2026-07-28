@@ -20,9 +20,12 @@ Enterprise-grade full-stack e-commerce system built as a **modular, cloud-native
 - [Tech Stack](#tech-stack)
 - [Prerequisites](#prerequisites)
 - [Quick Start](#quick-start)
+- [Local Database Setup](#local-database-setup)
 - [Docker Workflow](#docker-workflow)
 - [Build & Test](#build-and-test)
 - [Configuration](#configuration)
+- [Cart Cache Consistency](#cart-cache-consistency)
+- [Backend Change Roadmap](#backend-change-roadmap)
 - [Secrets & Security](#secrets-and-security)
 - [CI/CD](#cicd)
 - [SonarQube Analysis](#sonarqube-analysis)
@@ -215,6 +218,37 @@ npm run dev
 
 ---
 
+## Local Database Setup
+
+The local backend uses SQL Server LocalDB by default.
+
+| Connection field | Value |
+|------------------|-------|
+| Connection type | Microsoft SQL Server |
+| Server | `(localdb)\MSSQLLocalDB` |
+| Authentication | Windows Authentication |
+| Database | `ECommercePOC` |
+
+The matching development connection string is:
+
+```text
+Server=(localdb)\MSSQLLocalDB;Database=ECommercePOC;Integrated Security=True;TrustServerCertificate=True;MultipleActiveResultSets=True;
+```
+
+Create or refresh the development data from the repository root:
+
+```powershell
+.\scripts\seed-localdb.ps1
+```
+
+The script starts the `MSSQLLocalDB` instance, creates the database when
+required, applies the development data, and can be run repeatedly.
+
+If you do not have LocalDB installed, use the Docker workflow instead. The
+Docker database is named `EcommerceDB` and is exposed on `localhost,1433`.
+
+---
+
 ## Docker Workflow
 
 ### First-time setup
@@ -341,6 +375,64 @@ Key public settings: `VITE_API_BASE_URL`, `VITE_DEV_API_TARGET`,
 
 ---
 
+## Cart Cache Consistency
+
+Authenticated carts use SQL Server as the source of truth and Redis as a
+read-through cache. Each cached cart uses the key `user_{userId}_cart`.
+
+The backend invalidates that user-specific key after every successful cart
+mutation:
+
+- add an item;
+- change an item quantity;
+- remove an item;
+- clear the cart.
+
+This prevents navigation to `/cart` from loading an older Redis value and
+overwriting the current React cart state. No React-side workaround is needed.
+
+Existing cache entries created before this fix can be inspected and removed
+once:
+
+```powershell
+docker compose exec -T redis redis-cli --scan --pattern "user_*_cart"
+
+# Delete only keys returned by the scan, for example:
+docker compose exec -T redis redis-cli UNLINK user_1_cart user_2_cart
+```
+
+Do not use `FLUSHDB`; Redis also contains other application data. Deleted cart
+keys are recreated automatically from SQL Server on the next cart request.
+
+---
+
+## Backend Change Roadmap
+
+The React migration does not require a backend rewrite. Continue with the
+existing ASP.NET Core services and make changes incrementally.
+
+| Priority | Change | Status |
+|----------|--------|--------|
+| P0 | Invalidate Redis cart data after add, update, delete, and clear | Completed |
+| P0 | Keep secrets outside source control and validate required settings at startup | Completed |
+| P1 | Standardize REST response DTOs, validation errors, and HTTP status codes | Next |
+| P1 | Add integration tests covering React -> API -> Redis -> SQL workflows | Next |
+| P1 | Revalidate stock and use concurrency protection during checkout | Next |
+| P1 | Add idempotency protection for payment and checkout requests | Next |
+| P2 | Add SQL Server, Redis, and RabbitMQ health checks | Planned |
+| P2 | Add request, user, and message correlation IDs to structured logs | Planned |
+| P2 | Review access-token storage and introduce a refresh-token strategy | Planned |
+
+Recommended implementation order:
+
+1. Standardize API errors and DTO contracts.
+2. Add authenticated cart and checkout integration tests.
+3. Add checkout concurrency and idempotency controls.
+4. Add dependency health checks and correlation logging.
+5. Harden the long-lived authentication flow.
+
+---
+
 ## Secrets and Security
 
 **Never commit real secrets to source control.**
@@ -406,6 +498,9 @@ docker compose --profile quality up -d sonarqube-db sonarqube
 | Issue | Cause | Fix |
 |-------|-------|-----|
 | `MSB1003` on `dotnet build` | Wrong directory | Use full path: `dotnet build EcommerceAPI\BulkyBook-POC\Ecommerce.sln` |
+| Application requests `Microsoft.NETCore.App 9.0.0` | Only another major .NET runtime is installed | Install the x64 .NET 9 SDK/runtime side by side, then confirm with `dotnet --list-runtimes` |
+| Cannot connect to LocalDB | Wrong instance or authentication | Use `(localdb)\MSSQLLocalDB`, Windows Authentication, and database `ECommercePOC` |
+| Cart becomes empty after navigation | A Redis cart entry predates the cache-invalidation fix | Rebuild/restart `ecommerce-api`, scan `user_*_cart`, and delete only the stale cart keys |
 | Invalid Sonar token/URL | Missing env vars | Set `SONAR_TOKEN`, `SONAR_HOST_URL` in `.env` or environment |
 | Sonar `localhost:9000` refused (CI) | GitHub runner can't reach local SonarQube | Use cloud SonarQube or self-hosted runner |
 | Frontend 401/403/429 or CORS | API unreachable, auth, or rate limits | Check `VITE_API_BASE_URL`, JWT storage, CORS, and rate-limit headers |
