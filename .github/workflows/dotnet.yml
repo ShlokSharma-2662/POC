@@ -1,72 +1,93 @@
-# This workflow will build a .NET project
-# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-net
-
-name: Build and test
+name: CI - Build and test
 
 on:
   push:
-    branches: [ "Dev" ]
+    branches: ["Dev"]
   pull_request:
-    branches: [ "Dev" ]
+    branches: ["Dev"]
 
 jobs:
   backend:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: 9.0.x
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
 
-    - name: Restore dependencies
-      run: dotnet restore EcommerceAPI/BulkyBook-POC/Ecommerce.sln
+      - name: Restore dependencies
+        run: dotnet restore EcommerceAPI/BulkyBook-POC/Ecommerce.sln
 
-    - name: Build
-      run: dotnet build EcommerceAPI/BulkyBook-POC/Ecommerce.sln --no-restore --configuration Release
+      - name: Build
+        run: dotnet build EcommerceAPI/BulkyBook-POC/Ecommerce.sln --no-restore --configuration Release
 
-    - name: Test
-      run: dotnet test EcommerceAPI/BulkyBook-POC/Ecommerce.sln --no-build --configuration Release
+      - name: Test
+        run: dotnet test EcommerceAPI/BulkyBook-POC/Ecommerce.sln --no-build --configuration Release
 
   react-frontend:
     runs-on: ubuntu-latest
-
     defaults:
       run:
         working-directory: ecommerce-react
 
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Setup Node
-      uses: actions/setup-node@v4
-      with:
-        node-version: 22
-        cache: npm
-        cache-dependency-path: ecommerce-react/package-lock.json
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ecommerce-react/package-lock.json
 
-    - name: Install dependencies
-      run: npm ci
+      - name: Install dependencies
+        run: npm ci
 
-    - name: Typecheck
-      run: npm run typecheck
+      - name: Typecheck
+        run: npm run typecheck
 
-    - name: Lint
-      run: npm run lint
+      - name: Lint
+        run: npm run lint
 
-    - name: Unit tests
-      run: npm test
+      - name: Unit tests
+        run: npm test
 
-    - name: Production build
-      run: npm run build
+      - name: Production build
+        run: npm run build
 
-    - name: Install Playwright Chromium
-      run: npx playwright install --with-deps chromium
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
 
-    - name: Browser smoke tests
-      run: npm run e2e
+      - name: Browser smoke tests
+        run: npm run e2e
 
-    - name: Container build
-      run: docker build --tag ecommerce-react:ci .
+      - name: Container build
+        run: docker build --tag ecommerce-react:ci .
+
+  angular-frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ecommerce-ui
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ecommerce-ui/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Unit tests
+        run: npm run test -- --watch=false --browsers=ChromeHeadless --progress=false
+
+      - name: Production build
+        run: npm run build

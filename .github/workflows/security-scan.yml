@@ -1,0 +1,90 @@
+name: Security checks
+
+on:
+  push:
+    branches: ["Dev"]
+  pull_request:
+    branches: ["Dev"]
+  schedule:
+    - cron: "30 2 * * 1"
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+  security-events: write
+
+jobs:
+  codeql-dotnet:
+    name: CodeQL (.NET)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: csharp
+
+      - name: Restore
+        run: dotnet restore EcommerceAPI/BulkyBook-POC/Ecommerce.sln
+
+      - name: Build
+        run: dotnet build EcommerceAPI/BulkyBook-POC/Ecommerce.sln --no-restore --configuration Release
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@v3
+
+  codeql-javascript:
+    name: CodeQL (JavaScript/TypeScript)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+
+      - name: Setup frontend deps
+        run: |
+          cd ecommerce-react
+          npm ci
+          npm run build
+          cd ../ecommerce-ui
+          npm ci
+          npm run build
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@v3
+
+  secret-scan:
+    name: Secret scan (Gitleaks)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Scan for secrets
+        uses: gitleaks/gitleaks-action@v2
+        with:
+          args: detect --source . --redact --exit-code 1
