@@ -57,6 +57,9 @@ jobs:
         with:
           node-version: 22
           cache: npm
+          cache-dependency-path: |
+            ecommerce-react/package-lock.json
+            ecommerce-ui/package-lock.json
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
