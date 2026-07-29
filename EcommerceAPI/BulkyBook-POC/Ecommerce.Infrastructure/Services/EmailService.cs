@@ -9,8 +9,10 @@ using SendGrid;
 using SendGrid.Helpers.Mail;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Net;
+using System.Net.Mail;
 
 namespace Ecommerce.Infrastructure.Services
 {
@@ -19,16 +21,31 @@ namespace Ecommerce.Infrastructure.Services
         private readonly string _sendGridApiKey;
         private readonly string _fromEmail;
         private readonly string _fromName;
+        private readonly string? _orderConfirmationTemplateId;
+        private readonly string _frontendBaseUrl;
+        private readonly string _currencyCode;
+        private readonly ISendGridClient _sendGridClient;
         private readonly AppDbContext? _context;
         private readonly ILogger<EmailService>? _logger;
         private readonly IResiliencePolicyService? _resiliencePolicyService;
         private readonly IEmailFailureTracker? _failureTracker;
 
-        public EmailService(string sendGridApiKey, string fromEmail = "noreply@ecommerce.com", string fromName = "E-Commerce Store")
+        public EmailService(
+            string sendGridApiKey,
+            string fromEmail = "noreply@ecommerce.com",
+            string fromName = "E-Commerce Store",
+            string? orderConfirmationTemplateId = null,
+            ISendGridClient? sendGridClient = null,
+            string frontendBaseUrl = "http://localhost:4200",
+            string currencyCode = "usd")
         {
-            _sendGridApiKey = sendGridApiKey;
-            _fromEmail = fromEmail;
-            _fromName = fromName;
+            _sendGridApiKey = ValidateApiKey(sendGridApiKey);
+            _fromEmail = NormalizeEmailSetting(fromEmail, "noreply@ecommerce.com");
+            _fromName = NormalizeTextSetting(fromName, "E-Commerce Store");
+            _orderConfirmationTemplateId = NormalizeTemplateId(orderConfirmationTemplateId);
+            _frontendBaseUrl = NormalizeBaseUrl(frontendBaseUrl);
+            _currencyCode = NormalizeCurrencyCode(currencyCode);
+            _sendGridClient = sendGridClient ?? new SendGridClient(_sendGridApiKey);
             _context = null;
             _logger = null;
             _resiliencePolicyService = null;
@@ -40,14 +57,16 @@ namespace Ecommerce.Infrastructure.Services
             AppDbContext context, 
             ILogger<EmailService> logger,
             IResiliencePolicyService? resiliencePolicyService = null,
-            IEmailFailureTracker? failureTracker = null)
+            IEmailFailureTracker? failureTracker = null,
+            ISendGridClient? sendGridClient = null)
         {
-            _sendGridApiKey = configuration["SendGrid:ApiKey"] 
-                ?? throw new InvalidOperationException(
-                    "SendGrid API key is not configured. Please set it in User Secrets (development) or Azure Key Vault (production). " +
-                    "See SECRETS_MANAGEMENT_GUIDE.md for instructions.");
-            _fromEmail = configuration["SendGrid:FromEmail"] ?? "noreply@ecommerce.com";
-            _fromName = configuration["SendGrid:FromName"] ?? "E-Commerce Store";
+            _sendGridApiKey = ValidateApiKey(configuration["SendGrid:ApiKey"]);
+            _fromEmail = NormalizeEmailSetting(configuration["SendGrid:FromEmail"], "noreply@ecommerce.com");
+            _fromName = NormalizeTextSetting(configuration["SendGrid:FromName"], "E-Commerce Store");
+            _orderConfirmationTemplateId = NormalizeTemplateId(configuration["SendGrid:OrderConfirmationTemplateId"]);
+            _frontendBaseUrl = NormalizeBaseUrl(configuration["Frontend:BaseUrl"]);
+            _currencyCode = NormalizeCurrencyCode(configuration["Stripe:Currency"]);
+            _sendGridClient = sendGridClient ?? new SendGridClient(_sendGridApiKey);
             _context = context;
             _logger = logger;
             _resiliencePolicyService = resiliencePolicyService;
@@ -71,14 +90,28 @@ namespace Ecommerce.Infrastructure.Services
 
             try
             {
-                var client = new SendGridClient(_sendGridApiKey);
                 var from = new EmailAddress(_fromEmail, _fromName);
                 var to = new EmailAddress(userEmail, userName);
-                var subject = $"Order Confirmation - Order #{orderId}";
-                var htmlContent = GenerateOrderConfirmationEmailHtml(userName, orderId, orderItems, totalAmount, shippingAddress, phoneNumber);
-                var plainTextContent = GenerateOrderConfirmationEmailText(userName, orderId, orderItems, totalAmount, shippingAddress, phoneNumber);
+                SendGridMessage msg;
 
-                var msg = MailHelper.CreateSingleEmail(from, to, subject, plainTextContent, htmlContent);
+                if (_orderConfirmationTemplateId != null)
+                {
+                    var templateData = BuildOrderConfirmationTemplateData(
+                        userName,
+                        orderId,
+                        orderItems,
+                        totalAmount,
+                        shippingAddress,
+                        phoneNumber);
+                    msg = MailHelper.CreateSingleTemplateEmail(from, to, _orderConfirmationTemplateId, templateData);
+                }
+                else
+                {
+                    var subject = $"Order Confirmation - Order #{orderId}";
+                    var htmlContent = GenerateOrderConfirmationEmailHtml(userName, orderId, orderItems, totalAmount, shippingAddress, phoneNumber);
+                    var plainTextContent = GenerateOrderConfirmationEmailText(userName, orderId, orderItems, totalAmount, shippingAddress, phoneNumber);
+                    msg = MailHelper.CreateSingleEmail(from, to, subject, plainTextContent, htmlContent);
+                }
                 
                 // Apply retry and circuit breaker policies if available
                 if (_resiliencePolicyService != null)
@@ -89,7 +122,7 @@ namespace Ecommerce.Infrastructure.Services
                     
                     var response = await policy.ExecuteAsync(async () =>
                     {
-                        return await client.SendEmailAsync(msg);
+                        return await _sendGridClient.SendEmailAsync(msg);
                     });
 
                     if (response.IsSuccessStatusCode)
@@ -115,7 +148,7 @@ namespace Ecommerce.Infrastructure.Services
                 else
                 {
                     // Fallback to direct call if resilience policies not available
-                    var response = await client.SendEmailAsync(msg);
+                    var response = await _sendGridClient.SendEmailAsync(msg);
 
                     if (response.IsSuccessStatusCode)
                     {
@@ -163,7 +196,6 @@ namespace Ecommerce.Infrastructure.Services
         {
             try
             {
-                var client = new SendGridClient(_sendGridApiKey);
                 var from = new EmailAddress(_fromEmail, _fromName);
                 var to = new EmailAddress(userEmail, $"{firstName} {lastName}");
                 var subject = "Welcome to Our E-Commerce Store! 🎉";
@@ -171,7 +203,7 @@ namespace Ecommerce.Infrastructure.Services
                 var plainTextContent = GenerateRegistrationConfirmationEmailText(firstName, lastName);
 
                 var msg = MailHelper.CreateSingleEmail(from, to, subject, plainTextContent, htmlContent);
-                var response = await client.SendEmailAsync(msg);
+                var response = await _sendGridClient.SendEmailAsync(msg);
 
                 if (response.IsSuccessStatusCode)
                 {
@@ -192,7 +224,6 @@ namespace Ecommerce.Infrastructure.Services
         {
             try
             {
-                var client = new SendGridClient(_sendGridApiKey);
                 var from = new EmailAddress(_fromEmail, _fromName);
                 var subject = $"🆕 New Product Alert: {productName}";
                 var htmlContent = GenerateProductNotificationEmailHtml(productName, productDescription, productPrice, productImageUrl, categoryName);
@@ -203,7 +234,7 @@ namespace Ecommerce.Infrastructure.Services
                 if (userEmails.Any())
                 {
                     var msg = MailHelper.CreateSingleEmailToMultipleRecipients(from, userEmails, subject, plainTextContent, htmlContent);
-                    var response = await client.SendEmailAsync(msg);
+                    var response = await _sendGridClient.SendEmailAsync(msg);
 
                     if (response.IsSuccessStatusCode)
                     {
@@ -338,8 +369,8 @@ The E-Commerce Team";
                             </div>
                         </div>
                     </td>
-                    <td style='padding: 15px; border-bottom: 1px solid #eee; text-align: right; color: #333; font-weight: 600;'>₹{item.Price:F2}</td>
-                    <td style='padding: 15px; border-bottom: 1px solid #eee; text-align: right; color: #333; font-weight: 600;'>₹{item.TotalPrice:F2}</td>
+                    <td style='padding: 15px; border-bottom: 1px solid #eee; text-align: right; color: #333; font-weight: 600;'>{FormatCurrency(item.Price)}</td>
+                    <td style='padding: 15px; border-bottom: 1px solid #eee; text-align: right; color: #333; font-weight: 600;'>{FormatCurrency(item.TotalPrice)}</td>
                 </tr>"));
 
             return $@"
@@ -404,13 +435,13 @@ The E-Commerce Team";
                                 {itemsHtml}
                                 <tr class='total-row'>
                                     <td colspan='2' style='text-align: right; padding: 20px 15px; font-size: 18px;'><strong>Total Amount:</strong></td>
-                                    <td style='text-align: right; padding: 20px 15px; font-size: 18px; color: #667eea;'><strong>₹{totalAmount:F2}</strong></td>
+                                    <td style='text-align: right; padding: 20px 15px; font-size: 18px; color: #667eea;'><strong>{FormatCurrency(totalAmount)}</strong></td>
                                 </tr>
                             </tbody>
                         </table>
 
                         <div style='text-align: center; margin: 30px 0;'>
-                            <a href='#' class='btn' style='background-color: #667eea; color: white; text-decoration: none; padding: 12px 24px; border-radius: 5px; display: inline-block;'>Track Your Order</a>
+                            <a href='{_frontendBaseUrl}/my-orders' class='btn' style='background-color: #667eea; color: white; text-decoration: none; padding: 12px 24px; border-radius: 5px; display: inline-block;'>Track Your Order</a>
                         </div>
 
                         <div style='background-color: #e8f5e8; border-left: 4px solid #4caf50; padding: 15px; margin: 20px 0; border-radius: 0 5px 5px 0;'>
@@ -429,7 +460,7 @@ The E-Commerce Team";
 
                     <div class='footer'>
                         <p style='margin: 0 0 10px 0;'>Thank you for choosing our store!</p>
-                        <p style='margin: 0; font-size: 14px;'>This email was sent from noreply@ecommerce.com</p>
+                        <p style='margin: 0; font-size: 14px;'>This email was sent from {_fromEmail}</p>
                     </div>
                 </div>
             </body>
@@ -502,7 +533,7 @@ The E-Commerce Team";
 
         private string GenerateOrderConfirmationEmailText(string userName, string orderId, List<OrderItemEmailDto> orderItems, decimal totalAmount, string shippingAddress, string phoneNumber)
         {
-            var itemsText = string.Join("\n", orderItems.Select(item => $"- {item.ProductName} (Qty: {item.Quantity}) - ₹{item.TotalPrice:F2}"));
+            var itemsText = string.Join("\n", orderItems.Select(item => $"- {item.ProductName} (Qty: {item.Quantity}) - {FormatCurrency(item.TotalPrice)}"));
 
             return $@"
 Order Confirmation - Order #{orderId}
@@ -523,7 +554,7 @@ Phone: {phoneNumber}
 ORDER ITEMS:
 {itemsText}
 
-Total Amount: ₹{totalAmount:F2}
+Total Amount: {FormatCurrency(totalAmount)}
 
 What's Next?
 - We'll process your order within 24 hours
@@ -534,19 +565,18 @@ If you have any questions about your order, please don't hesitate to contact our
 
 Thank you for choosing our store!
 
-This email was sent from noreply@ecommerce.com";
+This email was sent from {_fromEmail}";
         }
 
         public async Task SendEmailAsync(string toEmail, string toName, string subject, string htmlContent, string plainTextContent)
         {
             try
             {
-                var client = new SendGridClient(_sendGridApiKey);
                 var from = new EmailAddress(_fromEmail, _fromName);
                 var to = new EmailAddress(toEmail, toName);
 
                 var msg = MailHelper.CreateSingleEmail(from, to, subject, plainTextContent, htmlContent);
-                var response = await client.SendEmailAsync(msg);
+                var response = await _sendGridClient.SendEmailAsync(msg);
 
                 if (response.IsSuccessStatusCode)
                 {
@@ -562,6 +592,151 @@ This email was sent from noreply@ecommerce.com";
                 _logger?.LogError(ex, "Error sending email to {ToEmail} with subject '{Subject}'", toEmail, subject);
                 throw;
             }
+        }
+
+        private object BuildOrderConfirmationTemplateData(
+            string userName,
+            string orderId,
+            IReadOnlyCollection<OrderItemEmailDto> orderItems,
+            decimal totalAmount,
+            string shippingAddress,
+            string phoneNumber)
+        {
+            var orderNumber = FormatOrderNumber(orderId);
+            var addressLines = (shippingAddress ?? string.Empty)
+                .Split(new[] { "\r\n", "\n", "\r" }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            var templateItems = orderItems.Select(item => new
+            {
+                productName = item.ProductName,
+                variant = string.Empty,
+                quantity = item.Quantity,
+                unitPrice = FormatCurrency(item.Price),
+                lineTotal = FormatCurrency(item.TotalPrice),
+                imageUrl = GetSafeImageUrl(item.ImageUrl)
+            }).ToList();
+
+            return new
+            {
+                preheader = $"Order {orderNumber} is confirmed and being prepared.",
+                customerName = userName,
+                orderNumber,
+                orderDate = DateTime.UtcNow.ToString("dd MMMM yyyy", CultureInfo.InvariantCulture),
+                orderStatus = "Confirmed",
+                orderItems = templateItems,
+                subtotal = FormatCurrency(totalAmount),
+                shipping = "Free",
+                tax = FormatCurrency(0m),
+                total = FormatCurrency(totalAmount),
+                shippingAddressLines = addressLines,
+                phoneNumber,
+                paymentMethod = "Paid securely by card",
+                deliveryEstimate = "3–5 business days",
+                orderUrl = $"{_frontendBaseUrl}/my-orders",
+                shopUrl = _frontendBaseUrl,
+                supportUrl = $"mailto:{_fromEmail}",
+                supportEmail = _fromEmail,
+                currentYear = DateTime.UtcNow.Year.ToString(CultureInfo.InvariantCulture)
+            };
+        }
+
+        private string FormatCurrency(decimal amount)
+        {
+            if (string.Equals(_currencyCode, "usd", StringComparison.OrdinalIgnoreCase))
+            {
+                return amount.ToString("C", CultureInfo.GetCultureInfo("en-US"));
+            }
+
+            return $"{_currencyCode.ToUpperInvariant()} {amount.ToString("N2", CultureInfo.InvariantCulture)}";
+        }
+
+        private static string FormatOrderNumber(string orderId)
+        {
+            if (Guid.TryParse(orderId, out var parsedOrderId))
+            {
+                return $"ORD-{parsedOrderId:D}".ToUpperInvariant();
+            }
+
+            return orderId.StartsWith("ORD-", StringComparison.OrdinalIgnoreCase)
+                ? orderId.ToUpperInvariant()
+                : $"ORD-{orderId}";
+        }
+
+        private static string GetSafeImageUrl(string? imageUrl)
+        {
+            return Uri.TryCreate(imageUrl, UriKind.Absolute, out var uri) &&
+                   string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
+                ? uri.AbsoluteUri
+                : string.Empty;
+        }
+
+        private static string ValidateApiKey(string? apiKey)
+        {
+            if (string.IsNullOrWhiteSpace(apiKey) || IsConfigurationPlaceholder(apiKey))
+            {
+                throw new InvalidOperationException(
+                    "SendGrid API key is not configured. Set it with .NET User Secrets, Docker secrets, or Azure Key Vault.");
+            }
+
+            return apiKey.Trim();
+        }
+
+        private static string? NormalizeTemplateId(string? templateId)
+        {
+            if (string.IsNullOrWhiteSpace(templateId) || IsConfigurationPlaceholder(templateId))
+            {
+                return null;
+            }
+
+            var normalized = templateId.Trim();
+            if (!normalized.StartsWith("d-", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException("SendGrid order-confirmation template ID must start with 'd-'.");
+            }
+
+            return normalized;
+        }
+
+        private static string NormalizeBaseUrl(string? baseUrl)
+        {
+            var candidate = string.IsNullOrWhiteSpace(baseUrl) ? "http://localhost:4200" : baseUrl.Trim();
+            if (!Uri.TryCreate(candidate, UriKind.Absolute, out var uri) ||
+                (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+            {
+                throw new InvalidOperationException("Frontend:BaseUrl must be an absolute HTTP or HTTPS URL.");
+            }
+
+            return candidate.TrimEnd('/');
+        }
+
+        private static string NormalizeCurrencyCode(string? currencyCode)
+        {
+            var normalized = string.IsNullOrWhiteSpace(currencyCode) ? "usd" : currencyCode.Trim().ToLowerInvariant();
+            return normalized.Length == 3 ? normalized : "usd";
+        }
+
+        private static string NormalizeTextSetting(string? value, string fallback)
+        {
+            return string.IsNullOrWhiteSpace(value) || IsConfigurationPlaceholder(value)
+                ? fallback
+                : value.Trim();
+        }
+
+        private static string NormalizeEmailSetting(string? value, string fallback)
+        {
+            var normalized = NormalizeTextSetting(value, fallback);
+            if (!MailAddress.TryCreate(normalized, out _))
+            {
+                throw new InvalidOperationException("SendGrid:FromEmail must be a valid email address.");
+            }
+
+            return normalized;
+        }
+
+        private static bool IsConfigurationPlaceholder(string value)
+        {
+            return value.StartsWith("SET_IN_", StringComparison.OrdinalIgnoreCase) ||
+                   value.StartsWith("YOUR_", StringComparison.OrdinalIgnoreCase) ||
+                   value.Contains("${", StringComparison.Ordinal);
         }
     }
 }

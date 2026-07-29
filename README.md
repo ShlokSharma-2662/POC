@@ -183,16 +183,45 @@ cd D:\POC_NEW\POC
 
 ### 2. Backend
 
+If the Docker stack is running, stop it first because the local React UI and
+HTTPS API use the same host ports:
+
+```powershell
+docker compose down
+```
+
+Synchronize the ignored SendGrid, Stripe, and JWT values into .NET User Secrets
+for all three backend projects:
+
+```powershell
+.\scripts\configure-local-secrets.ps1
+```
+
+The script reads SendGrid values from `.secrets`, Stripe values from the
+Git-ignored root `.env.local`, and `JWT_SECRET_KEY` from `.env`. It validates
+everything before writing, does not print secret values, and can be run
+repeatedly. Use `-WhatIf` to validate without changing User Secrets.
+
+Run the API and OrderService in separate terminals:
+
 ```powershell
 dotnet restore EcommerceAPI\BulkyBook-POC\Ecommerce.sln
 dotnet build EcommerceAPI\BulkyBook-POC\Ecommerce.sln
-dotnet run --project EcommerceAPI\BulkyBook-POC\Ecommerce.API
-dotnet run --project EcommerceAPI\BulkyBook-POC\Ecommerce.OrderService
+dotnet run --launch-profile https --project EcommerceAPI\BulkyBook-POC\Ecommerce.API
+dotnet run --launch-profile Ecommerce.OrderService --project EcommerceAPI\BulkyBook-POC\Ecommerce.OrderService
 ```
 
 - API: `https://localhost:7273`
 - Swagger: `https://localhost:7273/swagger`
 - GraphQL Playground: `https://localhost:7273/graphql`
+- OrderService Swagger: `https://localhost:64385/swagger`
+
+After building, an optional smoke test starts all three local backends on their
+HTTP development ports, verifies each Swagger page, and stops them again:
+
+```powershell
+.\scripts\verify-local-startup.ps1
+```
 
 Seed the local `ECommercePOC` LocalDB with repeatable development data:
 
@@ -207,6 +236,9 @@ Seed the local `ECommercePOC` LocalDB with repeatable development data:
 
 ### 3. Frontend
 
+Ensure `ecommerce-react\.env.local` contains the same Stripe publishable key as
+the root `.env.local`, using the name `VITE_STRIPE_PUBLISHABLE_KEY`.
+
 ```powershell
 cd ecommerce-react
 npm ci
@@ -215,6 +247,13 @@ npm run dev
 
 - UI: `http://localhost:4200`
 - Migration and cutover details: `docs/REACT_MIGRATION.md`
+
+Local Redis and RabbitMQ integrations remain disabled by default, so installing
+those services is not required. If testing OAuth locally, register these exact
+front-door callbacks with the providers:
+
+- `http://localhost:4200/api/oauth/callback`
+- `http://localhost:4200/api/google-oauth/callback`
 
 ---
 
@@ -255,13 +294,27 @@ Docker database is named `EcommerceDB` and is exposed on `localhost,1433`.
 
 ```powershell
 Copy-Item .env.example .env
-# Edit .env and set SQL_SA_PASSWORD, JWT_SECRET_KEY, and both Stripe keys
+# Edit .env and set SQL_SA_PASSWORD and JWT_SECRET_KEY
+# Put STRIPE_SECRET_KEY and STRIPE_PUBLISHABLE_KEY in the ignored .env.local
 ```
+
+Create a Git-ignored `.secrets` directory at the repository root for SendGrid.
+Each file contains only the raw value, without a `KEY=` prefix:
+
+| File | Value |
+|------|-------|
+| `.secrets/SendGrid__ApiKey` | Newly generated restricted SendGrid API key |
+| `.secrets/SendGrid__FromEmail` | SendGrid-verified sender address |
+| `.secrets/SendGrid__FromName` | Sender display name |
+| `.secrets/SendGrid__OrderConfirmationTemplateId` | Dynamic template ID (`d-...`) |
+
+Docker Compose mounts these files read-only into both backend services. They do
+not become React/Vite variables and are not included in backend image builds.
 
 ### Start full stack
 
 ```powershell
-docker compose up --build -d
+docker compose --env-file .env --env-file .env.local up --build -d
 ```
 
 Before enabling checkout against an existing database, apply
@@ -439,8 +492,9 @@ Recommended implementation order:
 
 | Environment | Approach |
 |-------------|----------|
-| Local dev | .NET User Secrets |
-| Runtime / CI | Environment variables |
+| Local dev | `.\scripts\configure-local-secrets.ps1` and .NET User Secrets |
+| Local Docker | Docker Compose secrets from the ignored `.secrets` directory |
+| Runtime / CI | Platform secret store or environment variables |
 | Production | Azure Key Vault or equivalent |
 
 Reference docs:
@@ -500,6 +554,9 @@ docker compose --profile quality up -d sonarqube-db sonarqube
 | `MSB1003` on `dotnet build` | Wrong directory | Use full path: `dotnet build EcommerceAPI\BulkyBook-POC\Ecommerce.sln` |
 | Application requests `Microsoft.NETCore.App 9.0.0` | Only another major .NET runtime is installed | Install the x64 .NET 9 SDK/runtime side by side, then confirm with `dotnet --list-runtimes` |
 | Cannot connect to LocalDB | Wrong instance or authentication | Use `(localdb)\MSSQLLocalDB`, Windows Authentication, and database `ECommercePOC` |
+| Local React cannot reach the API | The API started with its default HTTP profile | Run it with `--launch-profile https`; Vite proxies to `https://localhost:7273` |
+| Port 4200 or 7273 is already in use | The Docker stack and local processes are running together | Run `docker compose down`, then start the local services |
+| Stripe or SendGrid is not configured locally | Docker secret files were not copied into .NET User Secrets | Run `.\scripts\configure-local-secrets.ps1`, then restart the backend processes |
 | Cart becomes empty after navigation | A Redis cart entry predates the cache-invalidation fix | Rebuild/restart `ecommerce-api`, scan `user_*_cart`, and delete only the stale cart keys |
 | Invalid Sonar token/URL | Missing env vars | Set `SONAR_TOKEN`, `SONAR_HOST_URL` in `.env` or environment |
 | Sonar `localhost:9000` refused (CI) | GitHub runner can't reach local SonarQube | Use cloud SonarQube or self-hosted runner |

@@ -1,0 +1,42 @@
+{
+  "preheader": "Order SS-20260729-1042 is confirmed and being prepared.",
+  "customerName": "Aarav Sharma",
+  "orderNumber": "SS-20260729-1042",
+  "orderDate": "29 July 2026",
+  "orderStatus": "Confirmed",
+  "orderItems": [
+    {
+      "productName": "Bluetooth Headphones",
+      "variant": "Midnight Black",
+      "quantity": 1,
+      "unitPrice": "$149.99",
+      "lineTotal": "$149.99",
+      "imageUrl": "https://images.example.com/products/bluetooth-headphones.jpg"
+    },
+    {
+      "productName": "Wireless Charger",
+      "variant": "",
+      "quantity": 2,
+      "unitPrice": "$39.99",
+      "lineTotal": "$79.98",
+      "imageUrl": ""
+    }
+  ],
+  "subtotal": "$229.97",
+  "shipping": "Free",
+  "tax": "$0.00",
+  "total": "$229.97",
+  "shippingAddressLines": [
+    "14 Park Street",
+    "Kolkata, West Bengal 700016",
+    "India"
+  ],
+  "phoneNumber": "+91 98765 43210",
+  "paymentMethod": "Visa ending in 4242",
+  "deliveryEstimate": "2-4 August 2026",
+  "orderUrl": "https://shop.example.com/my-orders",
+  "shopUrl": "https://shop.example.com",
+  "supportUrl": "https://shop.example.com/support",
+  "supportEmail": "support@example.com",
+  "currentYear": "2026"
+}

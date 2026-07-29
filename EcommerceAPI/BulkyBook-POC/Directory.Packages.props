@@ -58,7 +58,7 @@
     <!-- Payments -->
     <PackageVersion Include="Stripe.net" Version="43.0.0" />
     <!-- Email Services -->
-    <PackageVersion Include="SendGrid" Version="9.29.2" />
+    <PackageVersion Include="SendGrid" Version="9.29.3" />
     <!-- Message Queuing -->
     <PackageVersion Include="MassTransit" Version="8.2.5" />
     <PackageVersion Include="MassTransit.RabbitMQ" Version="8.2.5" />

@@ -5,6 +5,7 @@
 .env
 .env.local
 .env.*.local
+.secrets/
 
 # Build logs
 build-diag.log
