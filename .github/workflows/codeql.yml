@@ -26,7 +26,7 @@ jobs:
           - language: csharp
             build-mode: manual
           - language: javascript-typescript
-            build-mode: manual
+            build-mode: none
 
     steps:
       - name: Checkout repository
@@ -37,16 +37,6 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 9.0.x
-
-      - name: Setup Node.js
-        if: matrix.language == 'javascript-typescript'
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: |
-            ecommerce-react/package-lock.json
-            ecommerce-ui/package-lock.json
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4
@@ -59,16 +49,6 @@ jobs:
         run: |
           dotnet restore EcommerceAPI/BulkyBook-POC/Ecommerce.sln
           dotnet build EcommerceAPI/BulkyBook-POC/Ecommerce.sln --no-restore --configuration Release
-
-      - name: Install dependencies and build JavaScript/TypeScript apps
-        if: matrix.language == 'javascript-typescript'
-        run: |
-          cd ecommerce-react
-          npm ci
-          npm run build
-          cd ../ecommerce-ui
-          npm ci
-          npm run build
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4
