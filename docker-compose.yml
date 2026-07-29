@@ -24,6 +24,15 @@ services:
       OAuth__BaseUrl: ${PUBLIC_APP_BASE_URL:-http://localhost:4200}
       GoogleOAuth__BaseUrl: ${PUBLIC_APP_BASE_URL:-http://localhost:4200}
       ReverseProxy__TrustForwardedHeaders: ${TRUST_FORWARDED_HEADERS:-false}
+    secrets:
+      - source: sendgrid_api_key
+        target: SendGrid__ApiKey
+      - source: sendgrid_from_email
+        target: SendGrid__FromEmail
+      - source: sendgrid_from_name
+        target: SendGrid__FromName
+      - source: sendgrid_order_confirmation_template_id
+        target: SendGrid__OrderConfirmationTemplateId
     ports:
       - "7273:8080"
     depends_on:
@@ -58,6 +67,15 @@ services:
       Frontend__AllowedOrigins__1: ${LEGACY_FRONTEND_BASE_URL:-http://localhost:4201}
       Cors__AllowedOrigins__0: ${FRONTEND_BASE_URL:-http://localhost:4200}
       Cors__AllowedOrigins__1: ${LEGACY_FRONTEND_BASE_URL:-http://localhost:4201}
+    secrets:
+      - source: sendgrid_api_key
+        target: SendGrid__ApiKey
+      - source: sendgrid_from_email
+        target: SendGrid__FromEmail
+      - source: sendgrid_from_name
+        target: SendGrid__FromName
+      - source: sendgrid_order_confirmation_template_id
+        target: SendGrid__OrderConfirmationTemplateId
     ports:
       - "7274:8080"
     depends_on:
@@ -188,6 +206,16 @@ services:
       - sonarqube_extensions:/opt/sonarqube/extensions
     networks:
       - ecommerce-network
+
+secrets:
+  sendgrid_api_key:
+    file: ./.secrets/SendGrid__ApiKey
+  sendgrid_from_email:
+    file: ./.secrets/SendGrid__FromEmail
+  sendgrid_from_name:
+    file: ./.secrets/SendGrid__FromName
+  sendgrid_order_confirmation_template_id:
+    file: ./.secrets/SendGrid__OrderConfirmationTemplateId
 
 volumes:
   sqlserver_data:

@@ -22,6 +22,10 @@ using System.Reflection;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Docker Compose mounts local/runtime secrets here. KeyPerFile converts
+// double underscores in file names (for example SendGrid__ApiKey) to ':'.
+builder.Configuration.AddKeyPerFile("/run/secrets", optional: true);
+
 // Configure Azure Key Vault if enabled
 var keyVaultEnabled = builder.Configuration.GetValue<bool>("KeyVault:Enabled", false);
 var keyVaultName = builder.Configuration["KeyVault:VaultName"];

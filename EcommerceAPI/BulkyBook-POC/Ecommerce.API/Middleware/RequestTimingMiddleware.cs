@@ -21,14 +21,14 @@ namespace Ecommerce.API.Middleware
 
         public async Task InvokeAsync(HttpContext context)
         {
+            _logger.LogInformation($"🔄 Request: {context.Request.Method} {context.Request.Path}");
+
+            var stopwatch = Stopwatch.StartNew();
+            await _next(context);
+            stopwatch.Stop();
+
             try
             {
-                _logger.LogInformation($"🔄 Request: {context.Request.Method} {context.Request.Path}");
-
-                var stopwatch = Stopwatch.StartNew();
-                await _next(context);
-                stopwatch.Stop();
-
                 var elapsedMs = stopwatch.ElapsedMilliseconds;
 
                 using var scope = _serviceProvider.CreateScope();

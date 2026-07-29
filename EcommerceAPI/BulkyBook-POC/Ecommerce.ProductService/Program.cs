@@ -19,6 +19,9 @@ using Microsoft.Extensions.DependencyInjection;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Docker/runtime secret files use double underscores as configuration delimiters.
+builder.Configuration.AddKeyPerFile("/run/secrets", optional: true);
+
 // Ensure KeyVault and other shared Config
 var keyVaultEnabled = builder.Configuration.GetValue<bool>("KeyVault:Enabled", false);
 var keyVaultName = builder.Configuration["KeyVault:VaultName"];

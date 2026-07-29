@@ -1,0 +1,48 @@
+Order confirmed - {{orderNumber}}
+
+Hi {{customerName}},
+
+Thank you for shopping with ShopSphere. We received your payment and your order
+is now confirmed.
+
+ORDER
+Number: {{orderNumber}}
+Placed: {{orderDate}}
+Status: {{orderStatus}}
+
+ITEMS
+{{#each orderItems}}
+- {{productName}}{{#if variant}} ({{variant}}){{/if}}
+  Quantity: {{quantity}}
+  Unit price: {{unitPrice}}
+  Line total: {{lineTotal}}
+{{/each}}
+
+Subtotal: {{subtotal}}
+Shipping: {{shipping}}
+Tax: {{tax}}
+TOTAL: {{total}}
+
+SHIPPING TO
+{{#each shippingAddressLines}}
+{{this}}
+{{/each}}
+Phone: {{phoneNumber}}
+
+PAYMENT
+{{paymentMethod}}
+
+Estimated delivery: {{deliveryEstimate}}
+
+View your order:
+{{orderUrl}}
+
+Need help?
+{{supportUrl}}
+{{supportEmail}}
+
+Card information is handled securely by Stripe and is never included in this
+email.
+
+ShopSphere
+{{shopUrl}}

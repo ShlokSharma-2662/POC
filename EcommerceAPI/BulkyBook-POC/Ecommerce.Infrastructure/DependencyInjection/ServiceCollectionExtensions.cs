@@ -476,7 +476,8 @@ public static class ServiceCollectionExtensions
                 x.AddConsumer<EmailConsumer>();
                 x.AddConsumer<UserRegisteredConsumer>();
                 x.AddConsumer<PasswordResetConsumer>();
-                x.AddConsumer<OrderCreatedConsumer>();
+                // CheckoutOrderHandler sends the detailed SendGrid template directly.
+                // Registering OrderCreatedConsumer here would send a second confirmation.
                 x.AddConsumer<OrderStatusChangedConsumer>();
                 x.AddConsumer<PaymentProcessedConsumer>();
                 x.AddConsumer<AdminNotificationConsumer>();
