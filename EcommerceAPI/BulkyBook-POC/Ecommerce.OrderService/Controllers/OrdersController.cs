@@ -291,23 +291,30 @@ namespace Ecommerce.OrderService.Controllers
                 }
  
                 // Trigger Azure Function for order fulfillment orchestration
-                var functionUrl = _configuration["Functions:OrderFulfillmentUrl"] ?? "http://localhost:7071/api/orders/fulfill";
-                try
+                var functionUrl = _configuration["Functions:OrderFulfillmentUrl"];
+                if (string.IsNullOrWhiteSpace(functionUrl))
                 {
-                    using var httpClient = _httpClientFactory.CreateClient();
-                    var response = await httpClient.PostAsJsonAsync(functionUrl, new { OrderId = orderId });
-                    if (response.IsSuccessStatusCode)
-                    {
-                        _logger.LogInformation("Successfully triggered order fulfillment orchestration for order {OrderId}", orderId);
-                    }
-                    else
-                    {
-                        _logger.LogWarning("Failed to trigger order fulfillment orchestration for order {OrderId}. Status: {Status}", orderId, response.StatusCode);
-                    }
+                    _logger.LogInformation("Skipping order fulfillment trigger for order {OrderId} because Functions:OrderFulfillmentUrl is not configured.", orderId);
                 }
-                catch (Exception ex)
+                else
                 {
-                    _logger.LogError(ex, "Error triggering order fulfillment for order {OrderId}", orderId);
+                    try
+                    {
+                        using var httpClient = _httpClientFactory.CreateClient();
+                        var response = await httpClient.PostAsJsonAsync(functionUrl, new { OrderId = orderId });
+                        if (response.IsSuccessStatusCode)
+                        {
+                            _logger.LogInformation("Successfully triggered order fulfillment orchestration for order {OrderId}", orderId);
+                        }
+                        else
+                        {
+                            _logger.LogWarning("Failed to trigger order fulfillment orchestration for order {OrderId}. Status: {Status}", orderId, response.StatusCode);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error triggering order fulfillment for order {OrderId}", orderId);
+                    }
                 }
  
                 var totalDuration = DateTime.UtcNow - startTime;
