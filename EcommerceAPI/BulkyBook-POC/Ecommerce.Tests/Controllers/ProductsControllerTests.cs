@@ -257,11 +257,9 @@ namespace Ecommerce.Tests.Controllers
             mockFile.Setup(f => f.CopyToAsync(It.IsAny<Stream>(), It.IsAny<CancellationToken>()))
                    .Returns(Task.CompletedTask);
 
-            _mockWebHostEnvironment.Setup(x => x.ContentRootPath).Returns("/test");
+            var contentRootPath = TestPathHelper.CreateWritableContentRootPath();
+            _mockWebHostEnvironment.Setup(x => x.ContentRootPath).Returns(contentRootPath);
             
-            // Mock directory creation
-            Directory.CreateDirectory("/test/Uploads/products");
-
             var request = new CreateProductWithImageRequest
             {
                 Name = "Test Product",
@@ -417,9 +415,9 @@ namespace Ecommerce.Tests.Controllers
         {
             // Arrange
             var fileName = "test.jpg";
-            var filePath = "/test/uploads/products/test.jpg";
             
-            _mockWebHostEnvironment.Setup(x => x.ContentRootPath).Returns("/test");
+            var contentRootPath = TestPathHelper.CreateWritableContentRootPath();
+            _mockWebHostEnvironment.Setup(x => x.ContentRootPath).Returns(contentRootPath);
             
             // Mock file existence
             var mockFileStream = new MemoryStream();
@@ -437,7 +435,8 @@ namespace Ecommerce.Tests.Controllers
         {
             // Arrange
             var fileName = "nonexistent.jpg";
-            _mockWebHostEnvironment.Setup(x => x.ContentRootPath).Returns("/test");
+            var contentRootPath = TestPathHelper.CreateWritableContentRootPath();
+            _mockWebHostEnvironment.Setup(x => x.ContentRootPath).Returns(contentRootPath);
 
             // Act
             var result = _controller.GetImage(fileName);
