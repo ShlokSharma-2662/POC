@@ -13,13 +13,20 @@ namespace Ecommerce.Application.Features.Products.Handlers
         private readonly AppDbContext _context;
         private readonly IEmailService _emailService;
         private readonly ICacheInvalidationService _cacheInvalidationService;
+        private readonly IProductStockUpdateNotifier _stockUpdateNotifier;
         private readonly ILogger<CreateProductHandler> _logger;
 
-        public CreateProductHandler(AppDbContext context, IEmailService emailService, ICacheInvalidationService cacheInvalidationService, ILogger<CreateProductHandler> logger)
+        public CreateProductHandler(
+            AppDbContext context,
+            IEmailService emailService,
+            ICacheInvalidationService cacheInvalidationService,
+            IProductStockUpdateNotifier stockUpdateNotifier,
+            ILogger<CreateProductHandler> logger)
         {
             _context = context;
             _emailService = emailService;
             _cacheInvalidationService = cacheInvalidationService;
+            _stockUpdateNotifier = stockUpdateNotifier;
             _logger = logger;
         }
 
@@ -58,6 +65,11 @@ namespace Ecommerce.Application.Features.Products.Handlers
             }
             await _cacheInvalidationService.InvalidateProductCacheAsync();
             await _cacheInvalidationService.InvalidateCategoryCacheAsync();
+            await _stockUpdateNotifier.NotifyProductStockUpdatedAsync(
+                product.ProductId,
+                product.Name,
+                product.Stock,
+                "Created");
 
             return product.ProductId;
         }

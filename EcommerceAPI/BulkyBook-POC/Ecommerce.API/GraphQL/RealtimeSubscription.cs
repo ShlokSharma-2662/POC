@@ -13,5 +13,12 @@ namespace Ecommerce.API.GraphQL
         {
             return payload;
         }
+
+        [Subscribe]
+        [Topic(GraphQlEventTopics.ProductStockUpdated)]
+        public ProductStockUpdatePayload OnProductStockUpdated([EventMessage] ProductStockUpdatePayload payload)
+        {
+            return payload;
+        }
     }
 }

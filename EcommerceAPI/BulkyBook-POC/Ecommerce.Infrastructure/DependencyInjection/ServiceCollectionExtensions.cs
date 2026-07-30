@@ -94,6 +94,7 @@ public static class ServiceCollectionExtensions
 
         // Event Grid Publisher Service
         services.AddHttpClient<IEventGridPublisherService, EventGridPublisherService>();
+        services.AddScoped<IProductStockUpdateNotifier, NoOpProductStockUpdateNotifier>();
 
         return services;
     }
