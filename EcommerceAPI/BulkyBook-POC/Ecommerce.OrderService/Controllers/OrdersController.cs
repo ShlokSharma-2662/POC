@@ -300,8 +300,18 @@ namespace Ecommerce.OrderService.Controllers
                 {
                     try
                     {
-                        using var httpClient = _httpClientFactory.CreateClient();
-                        var response = await httpClient.PostAsJsonAsync(functionUrl, new { OrderId = orderId });
+                            using var httpClient = _httpClientFactory.CreateClient();
+                        var response = await httpClient.PostAsJsonAsync(functionUrl, new
+                        {
+                            OrderId = orderId,
+                            UserId = userIdValue,
+                            TotalAmount = verifiedPayment.TotalAmount,
+                            Items = command.Items.Select(item => new
+                            {
+                                item.ProductId,
+                                item.Quantity
+                            })
+                        });
                         if (response.IsSuccessStatusCode)
                         {
                             _logger.LogInformation("Successfully triggered order fulfillment orchestration for order {OrderId}", orderId);

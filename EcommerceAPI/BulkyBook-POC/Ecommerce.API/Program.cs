@@ -5,6 +5,7 @@ using Ecommerce.API.GraphQL;
 using Ecommerce.API.GrpcServices;
 using Ecommerce.API.Middleware;
 using Ecommerce.API.Security;
+using Ecommerce.API.Services;
 using Ecommerce.Infrastructure.DependencyInjection;
 using Ecommerce.Infrastructure.Persistence;
 using FluentValidation;
@@ -57,6 +58,7 @@ if (keyVaultEnabled && !string.IsNullOrEmpty(keyVaultName))
 builder.Services.AddEcommerceServices(builder.Configuration);
 builder.Services.AddSingleton<IOAuthAuthorizationCodeStore, OAuthAuthorizationCodeStore>();
 builder.Services.AddScoped<IExternalOAuthUserService, ExternalOAuthUserService>();
+builder.Services.AddScoped<Ecommerce.Domain.Interfaces.IProductStockUpdateNotifier, ProductStockUpdateNotifier>();
 builder.Services.AddMediatR(Assembly.Load("Ecommerce.Application"));
 
 // gRPC

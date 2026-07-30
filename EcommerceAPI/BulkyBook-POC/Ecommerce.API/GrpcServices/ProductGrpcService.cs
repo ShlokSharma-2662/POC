@@ -1,6 +1,7 @@
 using Grpc.Core;
 using Ecommerce.Application.Features.Products.Queries;
 using Ecommerce.Application.Features.Products.Commands;
+using Ecommerce.Domain.Interfaces;
 using Ecommerce.Infrastructure.Persistence;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -13,15 +14,18 @@ public class ProductGrpcService : ProductService.ProductServiceBase
     private readonly AppDbContext _context;
     private readonly IMediator _mediator;
     private readonly ILogger<ProductGrpcService> _logger;
+    private readonly IProductStockUpdateNotifier _stockUpdateNotifier;
 
     public ProductGrpcService(
         AppDbContext context,
         IMediator mediator,
-        ILogger<ProductGrpcService> logger)
+        ILogger<ProductGrpcService> logger,
+        IProductStockUpdateNotifier stockUpdateNotifier)
     {
         _context = context;
         _mediator = mediator;
         _logger = logger;
+        _stockUpdateNotifier = stockUpdateNotifier;
     }
 
     public override async Task<ProductResponse> GetProduct(GetProductRequest request, ServerCallContext context)
@@ -107,6 +111,12 @@ public class ProductGrpcService : ProductService.ProductServiceBase
         }
 
         await _context.SaveChangesAsync();
+        await _stockUpdateNotifier.NotifyProductStockUpdatedAsync(
+            product.ProductId,
+            product.Name,
+            product.Stock,
+            request.IsIncrease ? "Increased" : "Decreased",
+            product.Stock > 0 ? "InStock" : "OutOfStock");
 
         return new StockUpdateResponse
         {

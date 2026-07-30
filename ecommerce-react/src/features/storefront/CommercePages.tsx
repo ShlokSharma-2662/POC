@@ -71,6 +71,40 @@ const stripePromise = environment.stripePublishableKey
   ? loadStripe(environment.stripePublishableKey)
   : Promise.resolve(null);
 
+const checkoutSteps = ['Delivery details', 'Secure payment', 'Order submitted'];
+
+function CheckoutProgress({
+  activeStep,
+  message,
+}: {
+  activeStep: 1 | 2 | 3;
+  message: string;
+}) {
+  return (
+    <div className={styles.checkoutProgress} aria-label="Checkout progress">
+      <span className={styles.checkoutNotice} role="status">
+        {message}
+      </span>
+      <ol>
+        {checkoutSteps.map((label, index) => {
+          const current = (index + 1) as 1 | 2 | 3;
+          return (
+            <li
+              className={`${styles.checkoutStep} ${
+                current === activeStep ? styles.checkoutStepActive : ''
+              }`}
+              key={label}
+            >
+              <span>{current}</span>
+              <strong>{label}</strong>
+            </li>
+          );
+        })}
+      </ol>
+    </div>
+  );
+}
+
 function CartImage({
   item,
   className,
@@ -290,6 +324,9 @@ export function CartPage() {
               Card details are entered securely through Stripe and are never
               stored by ShopSphere.
             </p>
+            <div className={styles.checkoutCallout}>
+              Standard shipping is free on all orders in supported regions.
+            </div>
           </aside>
         </div>
       )}
@@ -496,9 +533,17 @@ function CheckoutForm({ items }: { items: CartItem[] }) {
 
   const submitting = processingStep !== 'idle';
   const stripeConfigured = Boolean(environment.stripePublishableKey);
+  const activeStep = processingStep === 'payment' ? 2 : processingStep === 'order' ? 3 : 1;
+  const progressMessage =
+    processingStep === 'payment'
+      ? 'Payment is being authorized'
+      : processingStep === 'order'
+        ? 'Placing your order'
+        : 'Review details and complete checkout';
 
   return (
     <form className={styles.checkoutForm} onSubmit={handleSubmit(submit)} noValidate>
+      <CheckoutProgress activeStep={activeStep} message={progressMessage} />
       <section className={`${styles.checkoutPanel} surface`}>
         <span className={styles.stepLabel}>Step 1 of 2</span>
         <h2>Delivery details</h2>
@@ -594,6 +639,9 @@ function CheckoutForm({ items }: { items: CartItem[] }) {
             ? 'Placing order…'
             : `Pay ${formatCurrency(total)}`}
       </button>
+      <p className={styles.checkoutCallout}>
+        We never store your card details. Stripe handles all payment security.
+      </p>
     </form>
   );
 }
